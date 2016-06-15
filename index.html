@@ -44,9 +44,15 @@ html, body {
       <input id='1Mb' type="radio" name="resolution" value="1Mb" checked> 1Mb
       <input id='40kb' type="radio" name="resolution" value="40kb"> 40kb
     </form>
-      toggle chromosomes<br>
-      <button id='hide_all'>hide all</button>
-      <button id='show_all'>show all</button>
+    <form id='coloration'>
+      coloration<br>
+      <input id='chromosomal' type="radio" name="coloration" value="chromosomal" checked> chromosomal<br>
+      <input id='lamina' type="radio" name="coloration" value="lamina"> lamina association<br>
+      <input id='spectral' type="radio" name="coloration" value="spectral"> spectral
+    </form>
+    toggle chromosomes<br>
+    <button id='hide_all'>hide all</button>
+    <button id='show_all'>show all</button>
     <form id='chromosomes'>
     </form>
     <br style='float: clear'>
@@ -64,11 +70,13 @@ varying vec2 vUv;
 varying float noise;
 attribute float alpha;
 varying float vAlpha;
+varying vec3 vColor;
 
 void main() {
 
     vAlpha = alpha;
     vUv = uv;
+    vColor = color;
     gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
 
 }
@@ -78,17 +86,19 @@ void main() {
 varying vec2 vUv;
 varying float noise;
 varying float vAlpha;
+varying vec3 vColor;
 uniform vec3 colorsa;
 
 void main() {
 
-    gl_FragColor = vec4( colorsa, vAlpha );
+    gl_FragColor = vec4( vColor, vAlpha );
 
 }
 </script>
 <script>
 
-var colors = d3.scale.category20()
+var rainbow = d3.scale.category20()
+var coloration = 'chromosomal'
 var tubeMesh
 var tubes = {}
 var segments
@@ -165,7 +175,7 @@ function loadPDB(resolution) {
   $.get('data/Model_' + resolution + '.pdb', function(data) {
     var data = data.split('\n')
     for (var i = 0; i < data.length; i++) {
-      data[i] = {'x': parseFloat(data[i].substring(31,37)), 'y': parseFloat(data[i].substring(38,45)), 'z': parseFloat(data[i].substring(46,53))}
+      data[i] = {'x': parseFloat(data[i].substring(31,37)), 'y': parseFloat(data[i].substring(38,45)), 'z': parseFloat(data[i].substring(46,53)), 'lamina': data[i].substring(61,64) == '1.0'}
     }
     showPDB(data, resolution)
   })
@@ -181,6 +191,10 @@ $('#gene_search').keyup(function(e){
   if (value.length == 0) showAllGenes()
   else showGenes(parseInt(value))
 })
+$('#coloration input').click(function(){
+  coloration = $(this).val()
+  colorGenes()
+})
 
 
 init()
@@ -194,43 +208,55 @@ function showPDB(data, resolution) {
   segments = resolution == '1Mb' ? segments1Mb : segments40kb
 
   var array = []
+  var attributes = []
   for (var i = 0; i < data.length; i++) {
     array.push(new THREE.Vector3((data[i].x - 100) * 100, (data[i].y - 100) * 100, (data[i].z - 100) * 100))
+    attributes.push({
+      'lamina': data[i].lamina
+    })
   }
 
   arrays = []
   for (var i = 0; i < segments.length; i++) {
-    arrays.push(array.slice(segments[i][0] - 1, segments[i][1] - 1))
+    arrays.push({
+      'position': array.slice(segments[i][0] - 1, segments[i][1] - 1),
+      'attributes': attributes.slice(segments[i][0] - 1, segments[i][1] - 1),
+    })
     if (resolution == '40kb') arrays.push(array.slice(segments[i][0] - 1 + 63232, segments[i][1] - 1 + 63232))
   }
 
   tubeMesh = new THREE.Object3D()
   for (var i = 0; i < arrays.length; i++) {
-    var curve = new THREE.CatmullRomCurve3(arrays[i])
+    var curve = new THREE.CatmullRomCurve3(arrays[i].position)
     var geometry = new THREE.TubeGeometry(
         curve,  //path
         (segments[i % segments.length][1] - segments[i % segments.length][0]) * 5,    //segments
-        10,     //radius
+        4,     //radius
         5,     //radiusSegments
         false  //closed
     )
     bufferGeometry[i] = new THREE.BufferGeometry().fromGeometry(geometry)
     var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
-    for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 1
+    var colors = new Float32Array(bufferGeometry[i].attributes.position.count * 3)
+    var color = d3.rgb(rainbow(i))
+    for (var v = 0; v < bufferGeometry[i].attributes.position.count; v++) {
+      alphas[v] = 1
+      colors[(v * 3)] = color.r / 255
+      colors[(v * 3) + 1] = color.g / 255
+      colors[(v * 3) + 2] = color.b / 255
+    }
     bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+    bufferGeometry[i].attributes.color = new THREE.BufferAttribute(colors, 3)
     material = new THREE.ShaderMaterial({
-      uniforms: {
-        colorsa: {type: "c", value: new THREE.Color(colors(i))}
-      },
       vertexShader: document.getElementById('vertexShader').textContent,
       fragmentShader: document.getElementById('fragmentShader').textContent,
       vertexColors: THREE.VertexColors,
       transparent: true,
       depthWrite: false,
-    }) // material = new THREE.MeshBasicMaterial({color: colors(i)})
+    })
     tubes[i] = new THREE.Mesh(bufferGeometry[i], material)
     tubeMesh.add(tubes[i])
-    $('#chromosomes').append("<div id='chromosome" + i + "' class='border' style='border-color: " + colors(i) + "; background-color:" + colors(i) + "'></div>")
+    $('#chromosomes').append("<div id='chromosome" + i + "' class='border' style='border-color: " + rainbow(i) + "; background-color:" + rainbow(i) + "'></div>")
     $('#chromosome' + i).click(toggleChromosome(i))
     if (i % 7 == 6) $('#chromosomes').append('<br>')
   }
@@ -243,7 +269,7 @@ function showPDB(data, resolution) {
 function toggleChromosome(i) {
   return function() {
     tubes[i].visible = !tubes[i].visible
-    $('#chromosome' + i).css({ backgroundColor: tubes[i].visible ? colors(i) : '#000000' })
+    $('#chromosome' + i).css({ backgroundColor: tubes[i].visible ? rainbow(i) : '#000000' })
   }
 }
 
@@ -251,7 +277,7 @@ function toggleAllChromosomes(on) {
   return function() {
     for (var i = 0; i < arrays.length; i++) {
       tubes[i].visible = on
-      $('#chromosome' + i).css({ backgroundColor: on ? colors(i) : '#000000' })
+      $('#chromosome' + i).css({ backgroundColor: on ? rainbow(i) : '#000000' })
     }
   }
 }
@@ -275,6 +301,37 @@ function showGenes(bin) {
   }
 }
 
+function colorGenes() {
+  for (var i = 0; i < arrays.length; i++) {
+    var total = bufferGeometry[i].attributes.position.count
+    var colors = new Float32Array(total * 3)
+    if (coloration == 'chromosomal') {
+      var color = d3.rgb(rainbow(i))
+      for (var v = 0; v < total; v++) {
+        colors[(v * 3)] = color.r / 255
+        colors[(v * 3) + 1] = color.g / 255
+        colors[(v * 3) + 2] = color.b / 255
+      }
+    } else if (coloration == 'lamina') {
+      for (var bin = 0; bin < arrays[i].attributes.length; bin++) {
+        var lamina = arrays[i].attributes[bin].lamina
+        for (var v = bin * 30 * 5; v < (bin + 1) * 30 * 5; v++) {
+          colors[(v * 3)] = lamina ? 0 : 1
+          colors[(v * 3) + 1] = lamina ? 1 : 0
+          colors[(v * 3) + 2] = lamina ? 0.5 : 0
+        }
+      }
+    } else if (coloration == 'spectral') {
+      for (var v = 0; v < total; v++) {
+        colors[(v * 3)] = v / total
+        colors[(v * 3) + 1] = (total - v) / total
+        colors[(v * 3) + 2] = (total - v) / total
+      }
+    }
+    bufferGeometry[i].attributes.color = new THREE.BufferAttribute(colors, 3)
+  }
+}
+
 function init() {
 
   scene = new THREE.Scene()
@@ -285,34 +342,6 @@ function init() {
   // var light = new THREE.PointLight(0xffffff, 5, 2000)
   // light.position.set(0,0,2000)
   // scene.add(light)
-
-  // var x = 0
-  // var y = 0
-  // var z = 0
-  // var BOUND = 500
-  // var MOVE = 50
-  // var R = 600
-  // for (var i = 0; i < 20000; i++) {
-  //   if (Math.pow(x, 2) + Math.pow(y, 2) + Math.pow(z, 2) < Math.pow(R, 2)) {
-  //     x += Math.random() * MOVE - (MOVE / 2)
-  //     y += Math.random() * MOVE - (MOVE / 2)
-  //     z += Math.random() * MOVE - (MOVE / 2)
-  //   } else {
-  //     x *= 0.95
-  //     y *= 0.95
-  //     z *= 0.95
-  //   }
-  //   // if (x < BOUND & x > -BOUND) x += Math.random() * MOVE - (MOVE / 2)
-  //   // else if (x > -BOUND) x += Math.random() * -MOVE
-  //   // else x += Math.random() * MOVE
-  //   // if (y < BOUND & y > -BOUND) y += Math.random() * MOVE - (MOVE / 2)
-  //   // else if (y > -BOUND) y += Math.random() * -MOVE
-  //   // else y += Math.random() * MOVE
-  //   // if (z < BOUND & z > -BOUND) z += Math.random() * MOVE - (MOVE / 2)
-  //   // else if (z > -BOUND) z += Math.random() * -MOVE
-  //   // else z += Math.random() * MOVE
-  //   array.push(new THREE.Vector3(x, y, z))
-  // }
 
   renderer = new THREE.WebGLRenderer()
   renderer.setSize(window.innerWidth, window.innerHeight)

@@ -44,6 +44,14 @@ html, body {
   height: 200px;
   cursor: pointer;
 }
+#overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 100;
+}
 </style>
 <body>
   <div id='controls'>
@@ -54,7 +62,8 @@ html, body {
     </form>
     <form id='coloration'>
       coloration<br>
-      <input id='chromosomal' type="radio" name="coloration" value="chromosomal" checked> chromosomal<br>
+      <input id='none' type="radio" name="coloration" value="none" checked> none<br>
+      <input id='chromosomal' type="radio" name="coloration" value="chromosomal"> chromosomal<br>
       <input id='lamina' type="radio" name="coloration" value="lamina"> lamina association<br>
       <input id='spectral' type="radio" name="coloration" value="spectral"> spectral
     </form>
@@ -109,12 +118,16 @@ void main() {
 <script>
 
 var rainbow = d3.scale.category20()
-var coloration = 'chromosomal'
+var coloration = 'none'
 var tubeMesh
 var tubes = {}
 var segments
 var arrays
 var bufferGeometry = {}
+var spiders = []
+var lines = []
+var overlay
+
 var segments1Mb = [
   [4997, 5158],
   [4938, 4996],
@@ -246,19 +259,21 @@ function showPDB(data, resolution) {
   tubeMesh = new THREE.Object3D()
   for (var i = 0; i < arrays.length; i++) {
     var curve = new THREE.CatmullRomCurve3(arrays[i].position)
+    // var geometry = new THREE.Geometry()
+    // geometry.vertices = curve.getPoints((segments[i % segments.length][1] - segments[i % segments.length][0]) * 5)
     var geometry = new THREE.TubeGeometry(
         curve,  //path
         (segments[i % segments.length][1] - segments[i % segments.length][0]) * 5,    //segments
-        4,     //radius
-        resolution == '1Mb' ? 5 : 2,     //radiusSegments
+        resolution == '1Mb' ? 4 : 8,     //radius
+        3,     //radiusSegments
         false  //closed
     )
     bufferGeometry[i] = new THREE.BufferGeometry().fromGeometry(geometry)
     var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
     var colors = new Float32Array(bufferGeometry[i].attributes.position.count * 3)
-    var color = d3.rgb(rainbow(i))
+    var color = d3.rgb(255, 178, 5)
     for (var v = 0; v < bufferGeometry[i].attributes.position.count; v++) {
-      alphas[v] = 1
+      alphas[v] = 0.5
       colors[(v * 3)] = color.r / 255
       colors[(v * 3) + 1] = color.g / 255
       colors[(v * 3) + 2] = color.b / 255
@@ -270,7 +285,6 @@ function showPDB(data, resolution) {
       fragmentShader: document.getElementById('fragmentShader').textContent,
       vertexColors: THREE.VertexColors,
       transparent: true,
-      depthWrite: false,
     })
     tubes[i] = new THREE.Mesh(bufferGeometry[i], material)
     tubeMesh.add(tubes[i])
@@ -279,6 +293,12 @@ function showPDB(data, resolution) {
     if (i % 7 == 6) $('#chromosomes').append('<br>')
   }
   scene.add(tubeMesh)
+
+  addSpider(0, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
+  addSpider(1, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
+  addSpider(2, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
+  addSpider(3, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
+  addSpider(4, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
 
   camera.position.z = resolution == '1Mb' ? 3000 : 10000
 
@@ -303,7 +323,7 @@ function toggleAllChromosomes(on) {
 function showAllGenes() {
   for (var i = 0; i < arrays.length; i++) {
     var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
-    for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 1
+    for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.5
     bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
   }
 }
@@ -312,7 +332,7 @@ function showGenes(bin) {
   for (var i = 0; i < arrays.length; i++) {
     var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
     for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) {
-      if (a > bin * 30 * 5 && a < (bin + 1) * 30 * 5) alphas[a] = 1
+      if (a > bin * 30 * 5 && a < (bin + 1) * 30 * 5) alphas[a] = 0.5
       else alphas[a] = 0.1
     }
     bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
@@ -324,13 +344,21 @@ function colorGenes() {
     var total = bufferGeometry[i].attributes.position.count
     var colors = new Float32Array(total * 3)
     var alphas = new Float32Array(total)
-    if (coloration == 'chromosomal') {
+    if (coloration == 'none') {
+      var color = d3.rgb(255, 178, 5)
+      for (var v = 0; v < total; v++) {
+        colors[(v * 3)] = color.r / 255
+        colors[(v * 3) + 1] = color.g / 255
+        colors[(v * 3) + 2] = color.b / 255
+        alphas[v] = 0.5
+      }
+    } else if (coloration == 'chromosomal') {
       var color = d3.rgb(rainbow(i))
       for (var v = 0; v < total; v++) {
         colors[(v * 3)] = color.r / 255
         colors[(v * 3) + 1] = color.g / 255
         colors[(v * 3) + 2] = color.b / 255
-        alphas[v] = 1
+        alphas[v] = 0.8
       }
     } else if (coloration == 'lamina') {
       for (var bin = 0; bin < arrays[i].attributes.length; bin++) {
@@ -347,12 +375,54 @@ function colorGenes() {
         colors[(v * 3)] = v / total
         colors[(v * 3) + 1] = (total - v) / total
         colors[(v * 3) + 2] = (total - v) / total
-        alphas[v] = 1
+        alphas[v] = 0.8
       }
     }
     bufferGeometry[i].attributes.color = new THREE.BufferAttribute(colors, 3)
     bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
   }
+}
+
+function addSpider(chr, body, legs) {
+  var spider = new THREE.Object3D()
+  // var positions = tubeMesh.children[0].geometry.attributes.position.array
+  var positions = arrays[chr].position
+  geometry = new THREE.BoxGeometry(30, 30, 30, 2, 2, 2)
+  bodyMesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({color: 0xff0000}))
+  bodyMesh = new THREE.EdgesHelper(bodyMesh, 0xff0606)
+  bodyMesh.position.set(positions[body].x, positions[body].y, positions[body].z)
+  bodyMesh.matrixAutoUpdate = true
+  spider.add(bodyMesh)
+  for (var i = 0; i < legs.length; i++) {
+    legMesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({color: 0xffffff}))
+    legMesh = new THREE.EdgesHelper(legMesh, 0xfffffff)
+    legMesh.matrixAutoUpdate = true
+    legMesh.position.set(positions[legs[i]].x, positions[legs[i]].y, positions[legs[i]].z)
+    spider.add(legMesh)
+    var lineGeometry = new THREE.Geometry()
+    lineGeometry.vertices.push(bodyMesh.position)
+    lineGeometry.vertices.push(legMesh.position)
+    line = new THREE.Line(lineGeometry, new THREE.LineBasicMaterial({color: 0xffffff, opacity: 0.5}))
+    spider.add(line)
+  }
+  spiders.push(spider)
+  tubeMesh.add(spiders[spiders.length - 1])
+  overlay.append('text')
+    .text("| 0" + spiders.length)
+    .attr('x', window.innerWidth / 2 + 300)
+    .attr('y', window.innerHeight / 2 - 200 + (spiders.length * 15))
+    .attr('fill', '#ffffff')
+  var line = overlay.append('line')
+    .attr('x1', window.innerWidth / 2 + 300 - 5)
+    .attr('y1',  window.innerHeight / 2 - 200 + (spiders.length * 15) - 5)
+    .attr('x2', 0)
+    .attr('y2', 0)
+    .attr('opacity', 0.5)
+    .attr('stroke', '#fff')
+  lines.push({
+    'line': line,
+    'v': spiders[spiders.length - 1].children[0],
+  })
 }
 
 function init() {
@@ -369,6 +439,12 @@ function init() {
   renderer = new THREE.WebGLRenderer()
   renderer.setSize(window.innerWidth, window.innerHeight)
   document.body.appendChild(renderer.domElement)
+
+  overlay = d3.select('body').append('svg')
+    .attr('width', window.innerWidth)
+    .attr('height', window.innerHeight)
+    .attr('id', 'overlay')
+
   animate()
 
 }
@@ -379,12 +455,38 @@ function animate() {
 }
 
 function render() {
+  for (var i = 0; i < lines.length; i++) {
+    line = lines[i]
+    lines[i].line
+      .attr('x2', toScreenPosition(lines[i].v).x)
+      .attr('y2', toScreenPosition(lines[i].v).y)
+  }
   if (tubeMesh != null) {
-    tubeMesh.rotation.x += 0.01
-    tubeMesh.rotation.y += 0.01
-    tubeMesh.rotation.z += 0.01
+    tubeMesh.rotation.x += 0.001
+    tubeMesh.rotation.y += 0.001
+    tubeMesh.rotation.z += 0.001
   }
   renderer.render(scene, camera)
+}
+
+function toScreenPosition(obj) {
+    var vector = new THREE.Vector3()
+
+    var widthHalf = 0.5*renderer.context.canvas.width
+    var heightHalf = 0.5*renderer.context.canvas.height
+
+    obj.updateMatrixWorld()
+    vector.setFromMatrixPosition(obj.matrixWorld)
+    vector.project(camera)
+
+    vector.x = ( vector.x * widthHalf ) + widthHalf
+    vector.y = - ( vector.y * heightHalf ) + heightHalf
+
+    return {
+        x: vector.x,
+        y: vector.y
+    }
+
 }
 
 </script>

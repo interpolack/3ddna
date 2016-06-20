@@ -51,6 +51,7 @@ html, body {
   bottom: 0;
   left: 0;
   z-index: 100;
+  pointer-events: none;
 }
 </style>
 <body>
@@ -97,6 +98,7 @@ void main() {
     vAlpha = alpha;
     vUv = uv;
     vColor = color;
+    gl_PointSize = 1.0;
     gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
 
 }
@@ -232,6 +234,9 @@ function showPDB(data, resolution) {
 
   $('#chromosomes').empty()
   scene.remove(tubeMesh)
+  d3.selectAll('.label,.pointer').remove()
+  spiders = []
+  lines = []
 
   segments = resolution == '1Mb' ? segments1Mb : segments40kb
 
@@ -262,11 +267,11 @@ function showPDB(data, resolution) {
     // var geometry = new THREE.Geometry()
     // geometry.vertices = curve.getPoints((segments[i % segments.length][1] - segments[i % segments.length][0]) * 5)
     var geometry = new THREE.TubeGeometry(
-        curve,  //path
-        (segments[i % segments.length][1] - segments[i % segments.length][0]) * 5,    //segments
-        resolution == '1Mb' ? 4 : 8,     //radius
-        3,     //radiusSegments
-        false  //closed
+      curve,  //path
+      (segments[i % segments.length][1] - segments[i % segments.length][0]) * 5,    //segments
+      resolution == '1Mb' ? 4 : 8,     //radius
+      3,     //radiusSegments
+      false  //closed
     )
     bufferGeometry[i] = new THREE.BufferGeometry().fromGeometry(geometry)
     var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
@@ -286,7 +291,7 @@ function showPDB(data, resolution) {
       vertexColors: THREE.VertexColors,
       transparent: true,
     })
-    tubes[i] = new THREE.Mesh(bufferGeometry[i], material)
+    tubes[i] = new THREE.Points(bufferGeometry[i], material)
     tubeMesh.add(tubes[i])
     $('#chromosomes').append("<div id='chromosome" + i + "' class='border' style='border-color: " + rainbow(i) + "; background-color:" + rainbow(i) + "'></div>")
     $('#chromosome' + i).click(toggleChromosome(i))
@@ -412,6 +417,7 @@ function addSpider(chr, body, legs) {
     .attr('x', window.innerWidth / 2 + 300)
     .attr('y', window.innerHeight / 2 - 200 + (spiders.length * 15))
     .attr('fill', '#ffffff')
+    .attr('class', 'label')
   var line = overlay.append('line')
     .attr('x1', window.innerWidth / 2 + 300 - 5)
     .attr('y1',  window.innerHeight / 2 - 200 + (spiders.length * 15) - 5)
@@ -419,6 +425,7 @@ function addSpider(chr, body, legs) {
     .attr('y2', 0)
     .attr('opacity', 0.5)
     .attr('stroke', '#fff')
+    .attr('class', 'pointer')
   lines.push({
     'line': line,
     'v': spiders[spiders.length - 1].children[0],

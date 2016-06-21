@@ -129,7 +129,10 @@ var arrays
 var bufferGeometry = {}
 var spiders = []
 var lines = []
+var labels = []
 var overlay
+var width = window.innerWidth,
+    height = window.innerHeight
 
 var segments1Mb = [
   [4997, 5158],
@@ -301,6 +304,7 @@ function showPDB(data, resolution) {
     $('#chromosome' + i).click(toggleChromosome(i))
     if (i % 7 == 6) $('#chromosomes').append('<br>')
   }
+  tubeMesh.position.x = -1000
   scene.add(tubeMesh)
 
   addSpider(0, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
@@ -308,6 +312,7 @@ function showPDB(data, resolution) {
   addSpider(2, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
   addSpider(3, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
   addSpider(4, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
+  makeGraph()
 
   camera.position.z = resolution == '1Mb' ? 3000 : 10000
 
@@ -416,15 +421,16 @@ function addSpider(chr, body, legs) {
   }
   spiders.push(spider)
   tubeMesh.add(spiders[spiders.length - 1])
-  overlay.append('text')
+  var label = overlay.append('text')
     .text("| 0" + spiders.length)
-    .attr('x', window.innerWidth / 2 + 300)
-    .attr('y', window.innerHeight / 2 - 200 + (spiders.length * 15))
+    .attr('x', width / 2 + 100)
+    .attr('y', height / 2 - 200 + (spiders.length * 50))
     .attr('fill', '#ffffff')
     .attr('class', 'label')
+  labels.push(label)
   var line = overlay.append('line')
-    .attr('x1', window.innerWidth / 2 + 300 - 5)
-    .attr('y1',  window.innerHeight / 2 - 200 + (spiders.length * 15) - 5)
+    .attr('x1', width / 2 - 5 + 100)
+    .attr('y1',  height / 2 - 200 + (spiders.length * 50) - 5)
     .attr('x2', 0)
     .attr('y2', 0)
     .attr('opacity', 0.5)
@@ -436,10 +442,74 @@ function addSpider(chr, body, legs) {
   })
 }
 
+function makeGraph() {
+  var nodes = []
+  var links = []
+  var wires = []
+  for (var s = 0; s < spiders.length; s++) {
+    var spider = spiders[s]
+    var head = spider.children[0]
+    var h = nodes.length
+    var previous = head
+    nodes.push({'type': 0})
+    wires.push({'source': wires.length, 'target': nodes.length - 1})
+    for (var c = 1; c < spider.children.length; c++) {
+      var child = spider.children[c]
+      if (child.type == 'Line') continue
+      nodes.push({'type': 1})
+      links.push({'type': 0, 'source': h, 'target': nodes.length - 1, 'distance': head.position.distanceToSquared(child.position)})
+      links.push({'type': 1, 'source': nodes.length - 2, 'target': nodes.length - 1, 'distance': previous.position.distanceToSquared(child.position)})
+      previous = child
+    }
+  }
+  var force = d3.layout.force()
+    .nodes(nodes)
+    .links(links)
+    .size([width / 2, height])
+    .linkStrength(1.0)
+    .linkDistance(function(d){ return d.distance / 10000.0 })
+    .charge(-100)
+    .gravity(0.3)
+  var node = d3.select('#overlay').selectAll('.node')
+    .data(nodes)
+  var nodeEnter = node.enter().append('g')
+    .attr('class', 'node')
+  nodeEnter.append('rect')
+    .attr('width', 5)
+    .attr('height', 5)
+    .attr('x', -2.5)
+    .attr('y', -2.5)
+    .attr('fill', 'none')
+    .attr('stroke', function(d){ return d.type == 0 ? '#ff0000' : '#fff' })
+  var link = d3.select('#layer1').selectAll('.link')
+    .data(links).enter().append('line')
+    .attr('opacity', function(d){ return d.type == 0 ? 0.5 : 1.0 })
+    .attr('stroke', function(d){ return d.type == 0 ? '#fff' : '#fb0' })
+    .attr('class', 'link')
+  var wire = d3.select('#overlay').selectAll('.wire')
+    .data(wires).enter().append('line')
+    .attr('stroke', '#fff')
+    .attr('opacity', 0.5)
+    .attr('class', 'wire')
+  force.on('tick', function(){
+    d3.selectAll('.node').attr('transform', function(d){ return 'translate(' + (d.x + width/2) + ',' + d.y + ')' })
+    d3.selectAll('.link')
+      .attr('x1', function(d){ return d.source.x + width/2 })
+      .attr('x2', function(d){ return d.target.x + width/2 })
+      .attr('y1', function(d){ return d.source.y })
+      .attr('y2', function(d){ return d.target.y })
+    d3.selectAll('.wire')
+      .attr('x1', function(d){ return labels[d.source].attr('x') })
+      .attr('y1', function(d){ return labels[d.source].attr('y') - 5 })
+      .attr('x2', function(d){ return nodes[d.target].x + width/2 })
+      .attr('y2', function(d){ return nodes[d.target].y })
+  }).start()
+}
+
 function init() {
 
   scene = new THREE.Scene()
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 20000)
+  camera = new THREE.PerspectiveCamera(75, width / height, 1, 20000)
   camera.position.z = 3000
   scene.add(camera)
 
@@ -448,13 +518,14 @@ function init() {
   // scene.add(light)
 
   renderer = new THREE.WebGLRenderer()
-  renderer.setSize(window.innerWidth, window.innerHeight)
+  renderer.setSize(width, height)
   document.body.appendChild(renderer.domElement)
 
   overlay = d3.select('body').append('svg')
-    .attr('width', window.innerWidth)
-    .attr('height', window.innerHeight)
+    .attr('width', width)
+    .attr('height', height)
     .attr('id', 'overlay')
+  layer1 = overlay.append('g').attr('id', 'layer1')
 
   animate()
 

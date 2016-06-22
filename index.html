@@ -236,6 +236,7 @@ $('#coloration input').click(function(){
 
 init()
 loadPDB('1Mb')
+// showPDB([], 'sim')
 
 function showPDB(data, resolution) {
 
@@ -249,11 +250,33 @@ function showPDB(data, resolution) {
 
   var array = []
   var attributes = []
-  for (var i = 0; i < data.length; i++) {
-    array.push(new THREE.Vector3((data[i].x - 100) * 100, (data[i].y - 100) * 100, (data[i].z - 100) * 100))
-    attributes.push({
-      'lamina': data[i].lamina
-    })
+
+  if (resolution == 'sim') {
+    array = []
+    var x = 0
+    var y = 0
+    var z = 0
+    var MOVE = 500
+    var R = 5000
+    for (var i = 0; i < 200000; i++) {
+      if (Math.pow(x, 2) + Math.pow(y, 2) + Math.pow(z, 2) < Math.pow(R, 2)) {
+        x += Math.random() * MOVE - (MOVE / 2)
+        y += Math.random() * MOVE - (MOVE / 2)
+        z += Math.random() * MOVE - (MOVE / 2)
+      } else {
+        x *= 0.95
+        y *= 0.95
+        z *= 0.95
+      }
+      array.push(new THREE.Vector3(x, y, z))
+    }
+  } else {
+    for (var i = 0; i < data.length; i++) {
+      array.push(new THREE.Vector3((data[i].x - 100) * 100, (data[i].y - 100) * 100, (data[i].z - 100) * 100))
+      attributes.push({
+        'lamina': data[i].lamina
+      })
+    }
   }
 
   arrays = []
@@ -273,6 +296,7 @@ function showPDB(data, resolution) {
     var curve = new THREE.CatmullRomCurve3(arrays[i].position)
     // var geometry = new THREE.Geometry()
     // geometry.vertices = curve.getPoints((segments[i % segments.length][1] - segments[i % segments.length][0]) * 5)
+
     var geometry = new THREE.TubeGeometry(
       curve,  //path
       (segments[i % segments.length][1] - segments[i % segments.length][0]) * 5,    //segments
@@ -451,7 +475,7 @@ function makeGraph() {
     var head = spider.children[0]
     var h = nodes.length
     var previous = head
-    nodes.push({'type': 0})
+    nodes.push({'type': 0 })
     wires.push({'source': wires.length, 'target': nodes.length - 1})
     for (var c = 1; c < spider.children.length; c++) {
       var child = spider.children[c]

@@ -331,11 +331,14 @@ function showPDB(data, resolution) {
   tubeMesh.position.x = -1000
   scene.add(tubeMesh)
 
-  addSpider(0, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
-  addSpider(1, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
-  addSpider(2, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
-  addSpider(3, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
-  addSpider(4, 0, [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])
+  var legs = []
+  for (var i = 0; i < 120; i++) legs.push(i)
+
+  addSpider(0, 0, legs)
+  // addSpider(1, 0, legs)
+  // addSpider(2, 0, legs)
+  // addSpider(3, 0, legs)
+  // addSpider(4, 0, legs)
   makeGraph()
 
   camera.position.z = resolution == '1Mb' ? 3000 : 10000
@@ -475,24 +478,31 @@ function makeGraph() {
     var head = spider.children[0]
     var h = nodes.length
     var previous = head
-    nodes.push({'type': 0 })
+    nodes.push({'type': 0, 'child': spider.children[0]})
     wires.push({'source': wires.length, 'target': nodes.length - 1})
     for (var c = 1; c < spider.children.length; c++) {
       var child = spider.children[c]
       if (child.type == 'Line') continue
-      nodes.push({'type': 1})
-      links.push({'type': 0, 'source': h, 'target': nodes.length - 1, 'distance': head.position.distanceToSquared(child.position)})
+      nodes.push({'type': 1, 'child': spider.children[c]})
+      // links.push({'type': 0, 'source': h, 'target': nodes.length - 1, 'distance': head.position.distanceToSquared(child.position)})
       links.push({'type': 1, 'source': nodes.length - 2, 'target': nodes.length - 1, 'distance': previous.position.distanceToSquared(child.position)})
       previous = child
     }
+    for (var x = 0; x < nodes.length; x++) {
+      for (var y = 0; y < 6; y++) {
+        if (x < nodes.length - y) links.push({'type': 0, 'source': x, 'target': x + y, 'distance': nodes[x].child.position.distanceToSquared(nodes[x + y].child.position)})
+        if (x > y) links.push({'type': 0, 'source': x, 'target': x - y, 'distance': nodes[x].child.position.distanceToSquared(nodes[x - y].child.position)})
+      }
+    }
+    links.push({'type': 2, 'source': 0, 'target': nodes.length - 1, 'distance': 20000 })
   }
   var force = d3.layout.force()
     .nodes(nodes)
     .links(links)
     .size([width / 2, height])
-    .linkStrength(1.0)
-    .linkDistance(function(d){ return d.distance / 10000.0 })
-    .charge(-100)
+    .linkStrength(10.0)
+    .linkDistance(function(d){ return d.distance / 2000.0 })
+    .charge(-500)
     .gravity(0.3)
   var node = d3.select('#overlay').selectAll('.node')
     .data(nodes)
@@ -507,8 +517,14 @@ function makeGraph() {
     .attr('stroke', function(d){ return d.type == 0 ? '#ff0000' : '#fff' })
   var link = d3.select('#layer1').selectAll('.link')
     .data(links).enter().append('line')
-    .attr('opacity', function(d){ return d.type == 0 ? 0.5 : 1.0 })
-    .attr('stroke', function(d){ return d.type == 0 ? '#fff' : '#fb0' })
+    .attr('opacity', function(d){ return d.type == 0 ? 0.1 : 1.0 })
+    .attr('stroke', function(d){
+      switch (d.type) {
+        case 0: return '#fff'
+        case 1: return '#fb0'
+        case 2: return '#000'
+      }
+    })
     .attr('class', 'link')
   var wire = d3.select('#overlay').selectAll('.wire')
     .data(wires).enter().append('line')

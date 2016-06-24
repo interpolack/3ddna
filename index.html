@@ -67,7 +67,8 @@ html, body {
       <input id='none' type="radio" name="coloration" value="none" checked> none<br>
       <input id='chromosomal' type="radio" name="coloration" value="chromosomal"> chromosomal<br>
       <input id='lamina' type="radio" name="coloration" value="lamina"> lamina association<br>
-      <input id='spectral' type="radio" name="coloration" value="spectral"> spectral
+      <input id='spectral' type="radio" name="coloration" value="spectral"> spectral<br>
+      <input id='xist' type="radio" name="coloration" value="xist"> xistence
     </form>
     toggle chromosomes<br>
     <button id='hide_all'>hide all</button>
@@ -207,10 +208,16 @@ document.body.appendChild(stats.dom)
 function loadPDB(resolution) {
   $.get('data/Model_' + resolution + '.pdb', function(data) {
     var data = data.split('\n')
-    for (var i = 0; i < data.length; i++) {
+    for (var i = 0; i < data.length - 1; i++) {
       data[i] = {'x': parseFloat(data[i].substring(31,37)), 'y': parseFloat(data[i].substring(38,45)), 'z': parseFloat(data[i].substring(46,53)), 'lamina': data[i].substring(61,64) == '1.0'}
     }
-    showPDB(data, resolution)
+    $.get('data/0hr-Xist_' + resolution, function(xist) {
+      var xist = xist.split('\n')
+      for (var i = 0; i < xist.length - 1; i++) {
+        data[i].xist = parseFloat(xist[i].split('\t')[4])
+      }
+      showPDB(data, resolution)
+    })
   })
 }
 
@@ -274,7 +281,8 @@ function showPDB(data, resolution) {
     for (var i = 0; i < data.length; i++) {
       array.push(new THREE.Vector3((data[i].x - 100) * 100, (data[i].y - 100) * 100, (data[i].z - 100) * 100))
       attributes.push({
-        'lamina': data[i].lamina
+        'lamina': data[i].lamina,
+        'xist': data[i].xist
       })
     }
   }
@@ -417,6 +425,16 @@ function colorGenes() {
         colors[(v * 3) + 1] = (total - v) / total
         colors[(v * 3) + 2] = (total - v) / total
         alphas[v] = 0.8
+      }
+    } else if (coloration == 'xist') {
+      for (var bin = 0; bin < arrays[i].attributes.length; bin++) {
+        var xist = arrays[i].attributes[bin].xist
+        for (var v = bin * 30 * 5; v < (bin + 1) * 30 * 5; v++) {
+          colors[(v * 3)] = xist < 1 ? 0 : 1
+          colors[(v * 3) + 1] = xist > 1 ? 1 : 0
+          colors[(v * 3) + 2] = xist > 1 ? 0.5 : 0
+          alphas[v] = xist ? 1 : 0.5
+        }
       }
     }
     bufferGeometry[i].attributes.color = new THREE.BufferAttribute(colors, 3)

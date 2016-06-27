@@ -1,0 +1,174 @@
+<html>
+<script src='js/three.min.js'></script>
+<script src='js/jquery.js'></script>
+<script src='js/d3.js'></script>
+<script src='js/CanvasRenderer.js'></script>
+<script src='js/Projector.js'></script>
+<script src='js/stats.js'></script>
+<script src='js/queue.js'></script>
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Helvetica Neue';
+  color: #ffffff;
+  text-transform: uppercase;
+  font-size: 10px;
+  background-color: #000;
+}
+#controls {
+  padding: 10px;
+  background: none;
+  position: absolute;
+}
+#controls .border {
+  border: 2px solid #fff;
+  border-radius: 3px;
+  width: 10px;
+  height: 10px;
+  margin: 2px;
+  padding: 0;
+  float: left;
+  cursor: pointer;
+}
+#graph {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+</style>
+<body>
+  <svg id='graph'></svg>
+  <div id='controls'>
+    <form id='resolution'>
+      resolution<br>
+      <input id='1Mb' type="radio" name="resolution" value="1Mb" checked> 1Mb
+      <input id='40kb' type="radio" name="resolution" value="40kb"> 40kb
+    </form>
+  </div>
+</body>
+<script>
+
+var resolution = '1Mb',
+
+    all = [],
+    pdb,
+    pml,
+    rap,
+
+    nodes,
+    links = [],
+
+    width = window.innerWidth,
+    height = window.innerHeight
+
+var svg = d3.select('#graph')
+  .attr('width', width)
+  .attr('height', height)
+var layers = [svg.append('g'), svg.append('g'), svg.append('g')]
+
+var force = d3.layout.force()
+  .size([width, height])
+  .charge(0)
+  .linkStrength(0.3)
+  .linkDistance(5)
+  .on('tick', function(e) {
+    var k = e.alpha * 0.1
+    d3.selectAll('.node')
+      .each(function(o,j){
+        o.x += (width / 2 + (o.x3 - 100) * 100 - o.x) * k
+        o.y += (height / 2 + (o.y3 - 110) * 100 - o.y) * k
+      })
+      .attr('transform', function(d){ return 'translate(' + d.x + ',' + d.y + ')' })
+    d3.selectAll('.link')
+      .attr('x1', function(d){ return d.source.x })
+      .attr('y1', function(d){ return d.source.y })
+      .attr('x2', function(d){ return d.target.x })
+      .attr('y2', function(d){ return d.target.y })
+  })
+
+function requestData(url, callback) {
+  var req = new XMLHttpRequest
+  req.open("GET", url, true)
+  req.setRequestHeader("Accept", "application/json")
+  req.onreadystatechange = function() {
+    if (req.readyState === 4) {
+      if (req.status < 300) callback(null, JSON.parse(req.responseText))
+      else callback(req.status)
+    }
+  }
+  req.send(null)
+}
+
+function loadGenome(resolution) {
+  queue(1)
+    .defer(d3.text, 'data/Model_' + resolution + '.pdb')
+    .defer(d3.text, 'data/Model_' + resolution + '.pml')
+    .defer(d3.text, 'data/0hr-Xist_' + resolution)
+    .awaitAll(function(error, results){
+      pdb = results[0].split('\n')
+      for (var i = 0; i < pdb.length - 1; i++) {
+        all.push({
+          'x3': parseFloat(pdb[i].substring(31,37)),
+          'y3': parseFloat(pdb[i].substring(38,45)),
+          'z3': parseFloat(pdb[i].substring(46,53)),
+          'lamina': parseInt(pdb[i].substring(61,64))
+        })
+      }
+      pml = results[1].split('\n')
+      for (var i = pml.length - 1; i >= 0; i--) {
+        var line = pml[i]
+        if (line.substring(0, 6) != "select") pml.splice(i, 1)
+        else {
+          var split = pml[i].split(' ')[2].split('-')
+          pml[i] = [parseInt(split[0]), parseInt(split[1])]
+        }
+      }
+      pml.reverse()
+      rap = results[2].split('\n')
+      for (var i = 0; i < rap.length - 1; i++) {
+        var split = rap[i].split('\t')
+        var bin = parseInt(split[1]) / (resolution == '1Mb' ? 1000000 : 40000)
+        all[bin].expected = parseFloat(split[2])
+        all[bin].actual = parseFloat(split[3])
+        all[bin].ratio = parseFloat(split[4])
+      }
+      graphBins(chromosome(0))
+    })
+}
+
+function graphBins(data) {
+  nodes = data
+  var node = layers[1].selectAll('.node')
+    .data(nodes)
+  var nodeEnter = node.enter().append('g')
+    .attr('class', 'node')
+  nodeEnter.append('circle')
+    .attr('r', function(d){ return (d.z3 - 80) / 10 })
+    .attr('fill', function(d){ return d.lamina ? '#0f0' : '#f00' })
+
+  for (var i = 0; i < 1; i++) {
+    for (var j = pml[i][0] - 1; j < pml[i][1] - 2; j++) {
+      links.push({'source': j, 'target': j + 1})
+    }
+  }
+  var link = layers[0].selectAll('.link')
+    .data(links)
+    .enter()
+    .append('line')
+    .attr('stroke', '#000')
+    .attr('class', 'link')
+
+  force.nodes(nodes).links(links).start()
+}
+
+function chromosome(id) {
+  return all.slice(pml[id][0] - 1, pml[id][1] - 1)
+}
+
+loadGenome(resolution)
+
+</script>
+</html>

@@ -100,7 +100,6 @@ void main() {
     vAlpha = alpha;
     vUv = uv;
     vColor = color;
-    gl_PointSize = 1.0;
     gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
 
 }
@@ -214,7 +213,8 @@ function loadPDB(resolution) {
     $.get('data/0hr-Xist_' + resolution, function(xist) {
       var xist = xist.split('\n')
       for (var i = 0; i < xist.length - 1; i++) {
-        data[i].xist = parseFloat(xist[i].split('\t')[4])
+        var split = xist[i].split('\t')
+        data[i].xist = parseFloat(split[4])
       }
       showPDB(data, resolution)
     })
@@ -309,7 +309,7 @@ function showPDB(data, resolution) {
       curve,  //path
       (segments[i % segments.length][1] - segments[i % segments.length][0]) * 5,    //segments
       resolution == '1Mb' ? 4 : 8,     //radius
-      1,     //radiusSegments
+      3,     //radiusSegments
       false  //closed
     )
     bufferGeometry[i] = new THREE.BufferGeometry().fromGeometry(geometry)
@@ -330,7 +330,7 @@ function showPDB(data, resolution) {
       vertexColors: THREE.VertexColors,
       transparent: true,
     })
-    tubes[i] = new THREE.Points(bufferGeometry[i], material)
+    tubes[i] = new THREE.Mesh(bufferGeometry[i], material)
     tubeMesh.add(tubes[i])
     $('#chromosomes').append("<div id='chromosome" + i + "' class='border' style='border-color: " + rainbow(i) + "; background-color:" + rainbow(i) + "'></div>")
     $('#chromosome' + i).click(toggleChromosome(i))
@@ -430,10 +430,10 @@ function colorGenes() {
       for (var bin = 0; bin < arrays[i].attributes.length; bin++) {
         var xist = arrays[i].attributes[bin].xist
         for (var v = bin * 30 * 5; v < (bin + 1) * 30 * 5; v++) {
-          colors[(v * 3)] = xist < 1 ? 0 : 1
-          colors[(v * 3) + 1] = xist > 1 ? 1 : 0
-          colors[(v * 3) + 2] = xist > 1 ? 0.5 : 0
-          alphas[v] = xist ? 1 : 0.5
+          colors[(v * 3)] = xist < 1 ? 0.7 : (1 - xist)
+          colors[(v * 3) + 1] = (xist - 1)
+          colors[(v * 3) + 2] = (xist - 1)
+          alphas[v] = xist > 1 ? 1 : 0.5
         }
       }
     }
@@ -464,6 +464,7 @@ function addSpider(chr, body, legs) {
     line = new THREE.Line(lineGeometry, new THREE.LineBasicMaterial({color: 0xffffff, opacity: 0.5}))
     spider.add(line)
   }
+  spider.chromosome = chr
   spiders.push(spider)
   tubeMesh.add(spiders[spiders.length - 1])
   var label = overlay.append('text')
@@ -496,12 +497,12 @@ function makeGraph() {
     var head = spider.children[0]
     var h = nodes.length
     var previous = head
-    nodes.push({'type': 0, 'child': spider.children[0]})
+    nodes.push({'type': 0, 'child': spider.children[0], 'attributes': arrays[spider.chromosome].attributes[0]})
     wires.push({'source': wires.length, 'target': nodes.length - 1})
     for (var c = 1; c < spider.children.length; c++) {
       var child = spider.children[c]
       if (child.type == 'Line') continue
-      nodes.push({'type': 1, 'child': spider.children[c]})
+      nodes.push({'type': 1, 'child': spider.children[c], 'attributes': arrays[spider.chromosome].attributes[c]})
       // links.push({'type': 0, 'source': h, 'target': nodes.length - 1, 'distance': head.position.distanceToSquared(child.position)})
       links.push({'type': 1, 'source': nodes.length - 2, 'target': nodes.length - 1, 'distance': previous.position.distanceToSquared(child.position)})
       previous = child

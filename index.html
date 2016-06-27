@@ -336,13 +336,12 @@ function showPDB(data, resolution) {
     $('#chromosome' + i).click(toggleChromosome(i))
     if (i % 7 == 6) $('#chromosomes').append('<br>')
   }
-  tubeMesh.position.x = -1000
   scene.add(tubeMesh)
 
-  var legs = []
-  for (var i = 0; i < 120; i++) legs.push(i)
-
-  addSpider(0, 0, legs)
+  // var legs = []
+  // for (var i = 0; i < 120; i++) legs.push(i)
+  //
+  // addSpider(0, 0, legs)
   // addSpider(1, 0, legs)
   // addSpider(2, 0, legs)
   // addSpider(3, 0, legs)

@@ -47,11 +47,20 @@ html, body {
       <input id='1Mb' type="radio" name="resolution" value="1Mb" checked> 1Mb
       <input id='40kb' type="radio" name="resolution" value="40kb"> 40kb
     </form>
+    <form id='hour'>
+      hour<br>
+      <input id='0' type="radio" name="hour" value="0" checked> 0
+      <input id='1' type="radio" name="hour" value="1"> 1
+      <input id='1' type="radio" name="hour" value="2"> 2
+      <input id='1' type="radio" name="hour" value="3"> 3
+      <input id='1' type="radio" name="hour" value="4"> 6
+    </form>
   </div>
 </body>
 <script>
 
 var resolution = '1Mb',
+    hour = 0,
 
     all = [],
     pdb,
@@ -64,6 +73,11 @@ var resolution = '1Mb',
     width = window.innerWidth,
     height = window.innerHeight
 
+$('#hour input').click(function(){
+  hour = parseInt($(this).val())
+  force.start()
+})
+
 var svg = d3.select('#graph')
   .attr('width', width)
   .attr('height', height)
@@ -71,15 +85,17 @@ var layers = [svg.append('g'), svg.append('g'), svg.append('g')]
 
 var force = d3.layout.force()
   .size([width, height])
-  .charge(0)
+  .charge(-20)
   .linkStrength(0.3)
   .linkDistance(5)
   .on('tick', function(e) {
     var k = e.alpha * 0.1
     d3.selectAll('.node')
       .each(function(o,j){
-        o.x += (width / 2 + (o.x3 - 100) * 100 - o.x) * k
-        o.y += (height / 2 + (o.y3 - 110) * 100 - o.y) * k
+        // o.x += (width / 2 + (o.x3 - 100) * 100 - o.x) * k
+        // o.y += (height / 2 + (o.y3 - 110) * 100 - o.y) * k
+        if (o.rap[hour].ratio != null) o.x += (width / 2 + (o.rap[hour].ratio) * 10 - 500 - o.x) * k
+        else o.x += (width / 2 + (0) * 10 - 500 - o.x) * k
       })
       .attr('transform', function(d){ return 'translate(' + d.x + ',' + d.y + ')' })
     d3.selectAll('.link')
@@ -103,18 +119,23 @@ function requestData(url, callback) {
 }
 
 function loadGenome(resolution) {
-  queue(1)
-    .defer(d3.text, 'data/Model_' + resolution + '.pdb')
-    .defer(d3.text, 'data/Model_' + resolution + '.pml')
-    .defer(d3.text, 'data/0hr-Xist_' + resolution)
-    .awaitAll(function(error, results){
+  var q = queue(1)
+  q.defer(d3.text, 'data/Model_' + resolution + '.pdb')
+  q.defer(d3.text, 'data/Model_' + resolution + '.pml')
+  q.defer(d3.text, 'data/0hr-Xist_' + resolution)
+  q.defer(d3.text, 'data/1hr-Xist_' + resolution)
+  q.defer(d3.text, 'data/2hr-Xist_' + resolution)
+  q.defer(d3.text, 'data/3hr-Xist_' + resolution)
+  q.defer(d3.text, 'data/6hr-Xist_' + resolution)
+  q.awaitAll(function(error, results){
       pdb = results[0].split('\n')
       for (var i = 0; i < pdb.length - 1; i++) {
         all.push({
           'x3': parseFloat(pdb[i].substring(31,37)),
           'y3': parseFloat(pdb[i].substring(38,45)),
           'z3': parseFloat(pdb[i].substring(46,53)),
-          'lamina': parseInt(pdb[i].substring(61,64))
+          'lamina': parseInt(pdb[i].substring(61,64)),
+          'rap': {0: {}, 1: {}, 2: {}, 3: {}, 4: {}}
         })
       }
       pml = results[1].split('\n')
@@ -127,13 +148,15 @@ function loadGenome(resolution) {
         }
       }
       pml.reverse()
-      rap = results[2].split('\n')
-      for (var i = 0; i < rap.length - 1; i++) {
-        var split = rap[i].split('\t')
-        var bin = parseInt(split[1]) / (resolution == '1Mb' ? 1000000 : 40000)
-        all[bin].expected = parseFloat(split[2])
-        all[bin].actual = parseFloat(split[3])
-        all[bin].ratio = parseFloat(split[4])
+      for (var d = 0; d < 5; d++) {
+        rap = results[d + 2].split('\n')
+        for (var i = 0; i < rap.length - 1; i++) {
+          var split = rap[i].split('\t')
+          var bin = parseInt(split[1]) / (resolution == '1Mb' ? 1000000 : 40000)
+          all[bin].rap[d].expected = parseFloat(split[2])
+          all[bin].rap[d].actual = parseFloat(split[3])
+          all[bin].rap[d].ratio = parseFloat(split[4])
+        }
       }
       graphBins(chromosome(0))
     })
@@ -158,7 +181,7 @@ function graphBins(data) {
     .data(links)
     .enter()
     .append('line')
-    .attr('stroke', '#000')
+    .attr('stroke', '#666')
     .attr('class', 'link')
 
   force.nodes(nodes).links(links).start()

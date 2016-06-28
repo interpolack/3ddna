@@ -40,9 +40,8 @@ html, body {
 }
 #gene_track {
   position: relative;
-  border-radius: 5px;
   border: 1px solid #fff;
-  width: 50px;
+  width: 200px;
   height: 200px;
   cursor: pointer;
 }
@@ -54,6 +53,10 @@ html, body {
   left: 0;
   z-index: 100;
   pointer-events: none;
+}
+#contact_map {
+  width: 100%;
+  height: 100%;
 }
 </style>
 <body>
@@ -83,8 +86,10 @@ html, body {
     gene search<br>
     <input id='gene_search' type='text'><br>
     <br style='float: clear'>
-    gene track<br>
-    <div id='gene_track'></div>
+    contact map<br>
+    <div id='gene_track'>
+      <svg id='contact_map'></svg>
+    </div>
   </div>
   <div id='3d'></div>
 </body>
@@ -133,6 +138,7 @@ var rainbow = d3.scale.category20(),
     lines = [],
     labels = [],
     overlay,
+    cm = d3.select('#contact_map'),
     width = window.innerWidth,
     height = window.innerHeight,
 
@@ -226,8 +232,13 @@ $('#gene_search').keyup(function(e){
   else showGenes(parseInt(value))
 })
 $('#gene_track').on('mousemove', function(e){
-  var index = e.pageY - $(this).offset().top
-  showGenes(index)
+  var x = parseInt((e.pageX - $(this).offset().left) / 200 * segments[segments.length - 1][1])
+  var y = parseInt((e.pageY - $(this).offset().top) / 200 * segments[segments.length - 1][1])
+  var binX = indexToBin(x)
+  var binY = indexToBin(y)
+  crossCM(binX[0], binX[1], binY[0], binY[1])
+  colorBin(binX[0], binX[1], d3.rgb(255,0,0))
+  colorBin(binY[0], binY[1], d3.rgb(0,0,255))
 })
 $('#coloration input').click(function(){
   coloration = $(this).val()
@@ -316,17 +327,40 @@ function showAllGenes() {
   }
 }
 
-function showGenes(bin) {
-  for (var i = 0; i < segments.length; i++) {
-    var total = bufferGeometry[i].attributes.position.count
-    var alphas = new Float32Array(total)
-    var divisor = total / (segments[i][1] - segments[i][0])
-    for (var a = 0; a < total; a++) {
-      if (a > bin * divisor && a < (bin + 1) * divisor) alphas[a] = 1
-      else alphas[a] = 0
-    }
-    bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+function indexToBin(index) {
+  for (chromosome = 0; chromosome < segments.length - 1; chromosome++) {
+    if (index < segments[chromosome][1]) break
   }
+  var bin = index - segments[chromosome][0] - 1
+  return [chromosome, bin]
+}
+
+function binToIndex(chromosome, bin) {
+  return bin + segments[chromosome][0] - 1
+}
+
+function colorBin(chromosome, bin, color) {
+  // console.log(chromosome, bin)
+  var total = bufferGeometry[chromosome].attributes.position.count
+  var bins = segments[chromosome][1] - segments[chromosome][0]
+  var size = parseInt(total / bins)
+  // console.log(bufferGeometry[chromosome].attributes)
+  for (var v = bin * size; v < (bin + 1) * size; v++) {
+    bufferGeometry[chromosome].attributes.color.array[(v * 3)] = color.r / 255
+    bufferGeometry[chromosome].attributes.color.array[(v * 3) + 1] = color.g / 255
+    bufferGeometry[chromosome].attributes.color.array[(v * 3) + 2] = color.b / 255
+  }
+  bufferGeometry[chromosome].attributes.color.needsUpdate = true
+}
+
+function crossCM(chromosomeX, binX, chromosomeY, binY) {
+  var bins = segments[segments.length - 1][1]
+
+  var x = binToIndex(chromosomeX, binX) / bins * 200
+  cm.select('.crossY').attr('x1', x).attr('x2', x)
+
+  var y = binToIndex(chromosomeY, binX) / bins * 200
+  cm.select('.crossX').attr('y1', y).attr('y2', y)
 }
 
 function colorGenes() {
@@ -503,7 +537,7 @@ function init() {
   var geometry = new THREE.CubeGeometry(100, 100, 800, 2, 2, 2)
   var material = new THREE.MeshBasicMaterial({wireframe: true, color: 0xff0000, shading: THREE.FlatShading})
   firebox = new THREE.Mesh(geometry, material)
-  console.log(firebox)
+  // console.log(firebox)
   // scene.add(firebox)
   var geometry = new THREE.PlaneGeometry(4000, 4000, 2, 2)
   fireplane = new THREE.Mesh(geometry, material)
@@ -530,6 +564,17 @@ function init() {
     .attr('height', height)
     .attr('id', 'overlay')
   layer1 = overlay.append('g').attr('id', 'layer1')
+
+  cm.append('line')
+    .attr('stroke', '#fff')
+    .attr('x1', 0)
+    .attr('x2', 200)
+    .attr('class', 'crossX')
+  cm.append('line')
+    .attr('stroke', '#fff')
+    .attr('y1', 0)
+    .attr('y2', 200)
+    .attr('class', 'crossY')
 
   animate()
 
@@ -606,7 +651,8 @@ function onDocumentMouseMove(event) {
     var total = bufferGeometry[chromosome].attributes.alpha.count
     var bins = segments[chromosome][1] - segments[chromosome][0]
     var bin = parseInt(faceIndex / total * bins)
-    console.log(chromosome, bin)
+    colorBin(chromosome, bin, d3.rgb(255,0,0))
+    crossCM(chromosome, bin, chromosome, bin)
     firebox.position.copy(intersection.point)
     fireflight[fireIndex] = intersection.object
     fireflies[fireIndex].position.copy(intersection.point)

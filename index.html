@@ -101,7 +101,7 @@ void main() {
     vAlpha = alpha;
     vUv = uv;
     vColor = color;
-    gl_PointSize = 1.0;
+    gl_PointSize = 1.1;
     gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
 
 }
@@ -124,7 +124,7 @@ void main() {
 
 var rainbow = d3.scale.category20(),
     coloration = 'none',
-    genome,
+    genome = new THREE.Object3D(),
     chromosomes = {},
     segments,
     arrays,
@@ -137,79 +137,82 @@ var rainbow = d3.scale.category20(),
     height = window.innerHeight,
 
     all = [],
-    pdb,
-    segments
+    pdb = [],
+    segments = [],
+    rap = [],
+
+    raycaster,
+    mouse,
+    toggle = 0,
+    clock = new THREE.Clock(),
+    fireflies = [],
+    fireflight = [],
+    fireIndex = 0,
+    firebox,
+    fireplane
 
 var stats = new Stats()
 stats.showPanel(1)
 document.body.appendChild(stats.dom)
 
-function loadPDB(resolution) {var q = queue(1)
-q.defer(d3.text, 'data/Model_' + resolution + '.pdb')
-q.defer(d3.text, 'data/Model_' + resolution + '.pml')
-q.defer(d3.text, 'data/0hr-Xist_' + resolution)
-q.defer(d3.text, 'data/1hr-Xist_' + resolution)
-q.defer(d3.text, 'data/2hr-Xist_' + resolution)
-q.defer(d3.text, 'data/3hr-Xist_' + resolution)
-q.defer(d3.text, 'data/6hr-Xist_' + resolution)
-q.awaitAll(function(error, results){
-    segments = results[1].split('\n')
-    for (var i = segments.length - 1; i >= 0; i--) {
-      var line = segments[i]
-      if (line.substring(0, 6) != "select") segments.splice(i, 1)
-      else {
-        var split = segments[i].split(' ')[2].split('-')
-        segments[i] = [parseInt(split[0]), parseInt(split[1])]
+function loadPDB(resolution) {
+  all = []
+  pdb = []
+  segments = []
+  rap = []
+
+  var q = queue(1)
+  q.defer(d3.text, 'data/Model_' + resolution + '.pdb')
+  q.defer(d3.text, 'data/Model_' + resolution + '.pml')
+  q.defer(d3.text, 'data/0hr-Xist_' + resolution)
+  q.defer(d3.text, 'data/1hr-Xist_' + resolution)
+  q.defer(d3.text, 'data/2hr-Xist_' + resolution)
+  q.defer(d3.text, 'data/3hr-Xist_' + resolution)
+  q.defer(d3.text, 'data/6hr-Xist_' + resolution)
+  q.awaitAll(function(error, results){
+      segments = results[1].split('\n')
+      for (var i = segments.length - 1; i >= 0; i--) {
+        var line = segments[i]
+        if (line.substring(0, 6) != "select") segments.splice(i, 1)
+        else {
+          var split = segments[i].split(' ')[2].split('-')
+          segments[i] = [parseInt(split[0]), parseInt(split[1])]
+        }
       }
-    }
-    segments.reverse()
-    if (resolution == '40kb') {
-      var last = segments[segments.length - 1][1]
-      var length = segments.length
-      for (var i = 0; i < length; i++) {
-        segments.push([segments[i][0] + last, segments[i][1] + last])
+      segments.reverse()
+      if (resolution == '40kb') {
+        var last = segments[segments.length - 1][1]
+        var length = segments.length
+        for (var i = 0; i < length; i++) {
+          segments.push([segments[i][0] + last, segments[i][1] + last])
+        }
       }
-    }
-    pdb = results[0].split('\n')
-    chromosome = 0
-    for (var i = 0; i < pdb.length - 1; i++) {
-      if (i > segments[chromosome][1]) chromosome++
-      all.push({
-        'chromosome': chromosome,
-        'bin': i,
-        'x3': parseFloat(pdb[i].substring(31,37)),
-        'y3': parseFloat(pdb[i].substring(38,45)),
-        'z3': parseFloat(pdb[i].substring(46,53)),
-        'lamina': parseInt(pdb[i].substring(61,64)),
-        'rap': {0: {}, 1: {}, 2: {}, 3: {}, 4: {}}
-      })
-    }
-    for (var d = 0; d < 5; d++) {
-      rap = results[d + 2].split('\n')
-      for (var i = 0; i < rap.length - 1; i++) {
-        var split = rap[i].split('\t')
-        var bin = parseInt(split[1]) / (resolution == '1Mb' ? 1000000 : 40000)
-        all[bin].rap[d].expected = parseFloat(split[2])
-        all[bin].rap[d].actual = parseFloat(split[3])
-        all[bin].rap[d].ratio = parseFloat(split[4])
+      pdb = results[0].split('\n')
+      chromosome = 0
+      for (var i = 0; i < pdb.length - 1; i++) {
+        if (i > segments[chromosome][1]) chromosome++
+        all.push({
+          'chromosome': chromosome,
+          'bin': i,
+          'x3': parseFloat(pdb[i].substring(31,37)),
+          'y3': parseFloat(pdb[i].substring(38,45)),
+          'z3': parseFloat(pdb[i].substring(46,53)),
+          'lamina': parseInt(pdb[i].substring(61,64)),
+          'rap': {0: {}, 1: {}, 2: {}, 3: {}, 4: {}}
+        })
       }
-    }
-    showPDB(all, resolution)
-  })
-  // $.get('data/Model_' + resolution + '.pdb', function(data) {
-  //   var data = data.split('\n')
-  //   for (var i = 0; i < data.length - 1; i++) {
-  //     data[i] = {'x': parseFloat(data[i].substring(31,37)), 'y': parseFloat(data[i].substring(38,45)), 'z': parseFloat(data[i].substring(46,53)), 'lamina': data[i].substring(61,64) == '1.0'}
-  //   }
-  //   $.get('data/0hr-Xist_' + resolution, function(xist) {
-  //     var xist = xist.split('\n')
-  //     for (var i = 0; i < xist.length - 1; i++) {
-  //       var split = xist[i].split('\t')
-  //       data[i].xist = parseFloat(split[4])
-  //     }
-  //     showPDB(data, resolution)
-  //   })
-  // })
+      for (var d = 0; d < 5; d++) {
+        rap = results[d + 2].split('\n')
+        for (var i = 0; i < rap.length - 1; i++) {
+          var split = rap[i].split('\t')
+          var bin = parseInt(split[1]) / (resolution == '1Mb' ? 1000000 : 40000)
+          all[bin].rap[d].expected = parseFloat(split[2])
+          all[bin].rap[d].actual = parseFloat(split[3])
+          all[bin].rap[d].ratio = parseFloat(split[4])
+        }
+      }
+      showPDB(all, resolution)
+    })
 }
 
 $('#1Mb').click(function(){ loadPDB('1Mb') })
@@ -231,33 +234,31 @@ $('#coloration input').click(function(){
   colorGenes()
 })
 
-
 init()
 loadPDB('1Mb')
-// showPDB([], 'sim')
 
 function showPDB(data, resolution) {
 
   $('#chromosomes').empty()
   scene.remove(genome)
+  chromosomes = []
   d3.selectAll('.label,.pointer').remove()
   spiders = []
   lines = []
 
-  genome = new THREE.Object3D()
   for (var i = 0; i < segments.length; i++) {
     var segment = segments[i]
     var curve = new THREE.CatmullRomCurve3(
       all.slice(segment[0], segment[1]).map(function(values, bin){
-        return new THREE.Vector3((values.x3 - 100) * 100, (values.y3 - 100) * 100, (values.z3 - 100) * 100)
+        return new THREE.Vector3((values.x3 - 100), (values.y3 - 100), (values.z3 - 100))
       })
     )
 
     var geometry = new THREE.TubeGeometry(
       curve,  //path
       (segments[i % segments.length][1] - segments[i % segments.length][0]) * (resolution == '1Mb' ? 5 : 1),    //segments
-      resolution == '1Mb' ? 4 : 8,     //radius
-      1,     //radiusSegments
+      0.05,     //radius
+      3,     //radiusSegments
       false  //closed
     )
     bufferGeometry[i] = new THREE.BufferGeometry().fromGeometry(geometry)
@@ -278,7 +279,8 @@ function showPDB(data, resolution) {
       vertexColors: THREE.VertexColors,
       transparent: true,
     })
-    chromosomes[i] = new THREE.Points(bufferGeometry[i], material)
+    chromosomes[i] = new THREE.Mesh(bufferGeometry[i], material)
+    chromosomes[i].name = i
     genome.add(chromosomes[i])
     $('#chromosomes').append("<div id='chromosome" + i + "' class='border' style='border-color: " + rainbow(i) + "; background-color:" + rainbow(i) + "'></div>")
     $('#chromosome' + i).click(toggleChromosome(i))
@@ -286,7 +288,7 @@ function showPDB(data, resolution) {
   }
   scene.add(genome)
 
-  camera.position.z = 3000
+  camera.position.z = resolution == '1Mb' ? 20 : 6000
 
 }
 
@@ -316,10 +318,12 @@ function showAllGenes() {
 
 function showGenes(bin) {
   for (var i = 0; i < segments.length; i++) {
-    var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
-    for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) {
-      if (a > bin * 30 * 5 && a < (bin + 1) * 30 * 5) alphas[a] = 1
-      else alphas[a] = 0.05
+    var total = bufferGeometry[i].attributes.position.count
+    var alphas = new Float32Array(total)
+    var divisor = total / (segments[i][1] - segments[i][0])
+    for (var a = 0; a < total; a++) {
+      if (a > bin * divisor && a < (bin + 1) * divisor) alphas[a] = 1
+      else alphas[a] = 0
     }
     bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
   }
@@ -331,24 +335,29 @@ function colorGenes() {
     var colors = new Float32Array(total * 3)
     var alphas = new Float32Array(total)
     var color
+    var divisor = total / (segments[i][1] - segments[i][0])
     if (coloration == 'none') color = d3.rgb(255, 178, 5)
     else color = d3.rgb(rainbow(i))
-    for (var bin = 0; bin < all.length; bin++) {
+    for (var v = 0; v < total; v++) {
+      var bin = segments[i][0] + Math.floor(v / divisor)
       if (coloration == 'lamina') color = all[bin].lamina ? d3.rgb(0,255,100) : d3.rgb(255,0,0)
       else if (coloration == 'spectral') color = d3.rgb(
-        bin / all.length * 255,
-        (all.length - bin) / all.length * 255,
-        (all.length - bin) / all.length * 255
+        v / total * 255,
+        (total - v) / total * 255,
+        (total - v) / total * 255
       )
-      else if (coloration == 'xist') color = d3.rgb(
-        all[bin].rap[3].ratio < 1 ? 200 : (1 - all[bin].rap[3].ratio) * 255,
-        (all[bin].rap[3].ratio - 1) * 255,
-        (all[bin].rap[3].ratio - 1) * 100
-      )
-      colors[(bin * 3)] = color.r / 255
-      colors[(bin * 3) + 1] = color.g / 255
-      colors[(bin * 3) + 2] = color.b / 255
-      alphas[bin] = 0.5
+      else if (coloration == 'xist') {
+        var ratio = all[bin].rap[4].ratio
+        color = d3.rgb(
+          ratio < 1 ? 200 : (1 - ratio) * 255,
+          (ratio / 20) * 255,
+          (ratio / 20) * 100
+        )
+      }
+      colors[(v * 3)] = color.r / 255
+      colors[(v * 3) + 1] = color.g / 255
+      colors[(v * 3) + 2] = color.b / 255
+      alphas[v] = 0.5
     }
     bufferGeometry[i].attributes.color = new THREE.BufferAttribute(colors, 3)
     bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
@@ -489,9 +498,32 @@ function init() {
   // light.position.set(0,0,2000)
   // scene.add(light)
 
+  raycaster = new THREE.Raycaster()
+  mouse = new THREE.Vector2()
+  var geometry = new THREE.CubeGeometry(100, 100, 800, 2, 2, 2)
+  var material = new THREE.MeshBasicMaterial({wireframe: true, color: 0xff0000, shading: THREE.FlatShading})
+  firebox = new THREE.Mesh(geometry, material)
+  console.log(firebox)
+  // scene.add(firebox)
+  var geometry = new THREE.PlaneGeometry(4000, 4000, 2, 2)
+  fireplane = new THREE.Mesh(geometry, material)
+  // scene.add(fireplane)
+
+  var geometry = new THREE.SphereGeometry(0.1, 32, 32)
+
+  for (var i = 9; i < 40; i++) {
+    var firefly = new THREE.Mesh(geometry, material)
+    fireflies.push(firefly)
+    fireflight.push(null)
+    genome.add(firefly)
+  }
+
   renderer = new THREE.WebGLRenderer()
   renderer.setSize(width, height)
   document.body.appendChild(renderer.domElement)
+
+  window.addEventListener('resize', onWindowResize, false)
+  document.addEventListener('mousemove', onDocumentMouseMove, false)
 
   overlay = d3.select('body').append('svg')
     .attr('width', width)
@@ -511,17 +543,27 @@ function animate() {
 }
 
 function render() {
+
   for (var i = 0; i < lines.length; i++) {
     line = lines[i]
     lines[i].line
       .attr('x2', toScreenPosition(lines[i].v).x)
       .attr('y2', toScreenPosition(lines[i].v).y)
   }
-  if (genome != null) {
-    genome.rotation.x += 0.001
-    genome.rotation.y += 0.001
-    genome.rotation.z += 0.001
+  // if (genome != null) {
+  //   genome.rotation.x += 0.001
+  //   genome.rotation.y += 0.001
+  //   genome.rotation.z += 0.001
+  // }
+
+  for (var i = 0; i < fireflies.length; i++) {
+    var firefly = fireflies[i]
+    firefly.scale.multiplyScalar(0.98)
+    firefly.scale.clampScalar(0.01, 1)
   }
+
+  toggle += clock.getDelta()
+
   renderer.render(scene, camera)
 }
 
@@ -542,6 +584,36 @@ function toScreenPosition(obj) {
         x: vector.x,
         y: vector.y
     }
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight
+  camera.updateProjectionMatrix()
+  renderer.setSize(window.innerWidth, window.innerHeight)
+}
+
+function onDocumentMouseMove(event) {
+  event.preventDefault()
+  mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1
+  mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1
+
+  raycaster.setFromCamera(mouse, camera)
+  var intersections = raycaster.intersectObjects(genome.children)
+  var intersection = ( intersections.length ) > 0 ? intersections[ 0 ] : null
+  if (toggle > 0.02 && intersection !== null && intersection.object.visible && intersection.object.name !== "") {
+    var chromosome = intersection.object.name
+    var faceIndex = intersection.faceIndex
+    var total = bufferGeometry[chromosome].attributes.alpha.count
+    var bins = segments[chromosome][1] - segments[chromosome][0]
+    var bin = parseInt(faceIndex / total * bins)
+    console.log(chromosome, bin)
+    firebox.position.copy(intersection.point)
+    fireflight[fireIndex] = intersection.object
+    fireflies[fireIndex].position.copy(intersection.point)
+    fireflies[fireIndex].scale.set(1, 1, 1)
+    fireIndex = (fireIndex + 1) % fireflies.length
+    toggle = 0
+  }
 
 }
 

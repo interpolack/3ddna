@@ -3,6 +3,7 @@
 <script src='js/jquery.js'></script>
 <script src='js/d3.js'></script>
 <script src='js/CanvasRenderer.js'></script>
+<script src='js/TrackballControls.js'></script>
 <script src='js/Projector.js'></script>
 <script src='js/stats.js'></script>
 <script src='js/queue.js'></script>
@@ -155,6 +156,7 @@ var rainbow = d3.scale.category20(),
 
     raycaster,
     mouse,
+    controls,
     toggle = 0,
     clock = new THREE.Clock(),
     fireflies = [],
@@ -293,8 +295,8 @@ function showPDB(data, resolution) {
 
     var geometry = new THREE.TubeGeometry(
       curve,  //path
-      (segments[i % segments.length][1] - segments[i % segments.length][0]) * (resolution == '1Mb' ? 5 : 1),    //segments
-      0.05,     //radius
+      (segments[i % segments.length][1] - segments[i % segments.length][0]) * (resolution == '1Mb' ? 5 : 2),    //segments
+      resolution == '1Mb' ? 0.05 : 0.1,     //radius
       3,     //radiusSegments
       false  //closed
     )
@@ -544,6 +546,11 @@ function init() {
   renderer.setSize(width, height)
   document.body.appendChild(renderer.domElement)
 
+  controls = new THREE.TrackballControls(camera, renderer.domElement)
+  // controls.enableDamping = true
+  // // controls.dampingFactor = 0.9
+  // controls.enableZoom = true
+
   window.addEventListener('resize', onWindowResize, false)
   document.addEventListener('mousemove', onDocumentMouseMove, false)
 
@@ -607,6 +614,7 @@ function init() {
 function animate() {
   requestAnimationFrame(animate)
   stats.begin()
+  controls.update()
   render()
   stats.end()
 }

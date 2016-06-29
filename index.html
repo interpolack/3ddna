@@ -160,6 +160,7 @@ var rainbow = d3.scale.category20(),
     fireflies = [],
     fireflight = [],
     fireIndex = 0,
+    fireLine,
 
     launch = true
 
@@ -249,14 +250,16 @@ $('#gene_search').keyup(function(e){
   if (value.length == 0) showAllGenes()
   else showGenes(parseInt(value))
 })
-$('#gene_track').on('mousemove', function(e){
-  var x = parseInt((e.pageX - $(this).offset().left) / cmSize * segments[segments.length - 1][1])
-  var y = parseInt((e.pageY - $(this).offset().top) / cmSize * segments[segments.length - 1][1])
-  var binX = indexToBin(x)
-  var binY = indexToBin(y)
-  crossCM(binX[0], binX[1], binY[0], binY[1])
-  colorBin(binX[0], binX[1], d3.rgb(255,0,0))
-  colorBin(binY[0], binY[1], d3.rgb(0,0,255))
+$('#contact_map').on('mousemove', function(e){
+  var mx = e.pageX - $(this).offset().left
+  var my = e.pageY - $(this).offset().top
+  var x = parseInt(mx / cmSize * segments[segments.length - 1][1])
+  var y = parseInt(my / cmSize * segments[segments.length - 1][1])
+  var binA = indexToBin(x)
+  var binB = indexToBin(y)
+  cm.select('.crossX').attr('y1', my).attr('y2', my)
+  cm.select('.crossY').attr('x1', mx).attr('x2', mx)
+  showContact(binA[0], binA[1], binB[0], binB[1])
 })
 $('#coloration input').click(function(){
   coloration = $(this).val()
@@ -330,6 +333,13 @@ function showPDB(data, resolution) {
     fireflight.push(null)
     genome.add(firefly)
   }
+
+  geometry = new THREE.Geometry()
+  geometry.vertices.push(new THREE.Vector3(0, 0, 0))
+  geometry.vertices.push(new THREE.Vector3(0, 0, 0))
+  material = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 3 })
+  fireLine = new THREE.Line(geometry, material)
+  genome.add(fireLine)
 
   camera.position.z = resolution == '1Mb' ? 20 : 60
 
@@ -416,13 +426,21 @@ function colorBin(chromosome, bin, color) {
   bufferGeometry[chromosome].attributes.color.needsUpdate = true
 }
 
-function crossCM(chromosomeX, binX, chromosomeY, binY) {
+function showContact(chromosomeA, binA, chromosomeB, binB) {
+  var positionA = chromosomes[chromosomeA].geometry.attributes.position.array.slice(binA * 3, (binA * 3) + 3)
+  var positionB = chromosomes[chromosomeB].geometry.attributes.position.array.slice(binB * 3, (binB * 3) + 3)
+  fireLine.geometry.vertices[0].set(positionA[0], positionA[1], positionA[2])
+  fireLine.geometry.vertices[1].set(positionB[0], positionB[1], positionB[2])
+  fireLine.geometry.verticesNeedUpdate = true
+}
+
+function crossCM(chromosomeA, binA, chromosomeB, binB) {
   var bins = segments[segments.length - 1][1]
 
-  var x = binToIndex(chromosomeX, binX) / bins * cmSize
+  var x = binToIndex(chromosomeA, binA) / bins * cmSize
   cm.select('.crossY').transition().attr('x1', x).attr('x2', x)
 
-  var y = binToIndex(chromosomeY, binX) / bins * cmSize
+  var y = binToIndex(chromosomeB, binB) / bins * cmSize
   cm.select('.crossX').transition().attr('y1', y).attr('y2', y)
 }
 
@@ -546,11 +564,13 @@ function init() {
     .attr('x1', 0)
     .attr('x2', 200)
     .attr('class', 'crossX')
+    .attr('pointer-events', 'none')
   cm.append('line')
     .attr('stroke', '#fff')
     .attr('y1', 0)
     .attr('y2', 200)
     .attr('class', 'crossY')
+    .attr('pointer-events', 'none')
 
   force = d3.layout.force()
     .size([cgSize, cgSize])

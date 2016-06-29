@@ -30,12 +30,13 @@ html, body {
   float: left;
   cursor: pointer;
 }
-#gene_track {
+.panel {
   position: relative;
   border: 1px solid #fff;
   width: 200px;
   height: 200px;
   cursor: pointer;
+  background-color: #000;
 }
 #overlay {
   position: absolute;
@@ -47,6 +48,10 @@ html, body {
   pointer-events: none;
 }
 #contact_map {
+  width: 100%;
+  height: 100%;
+}
+#contact_graph {
   width: 100%;
   height: 100%;
 }
@@ -74,8 +79,13 @@ html, body {
     <br>
     <br style='float: clear'>
     contact map<br>
-    <div id='gene_track'>
+    <div class='panel'>
       <svg id='contact_map'></svg>
+    </div>
+    <br>
+    contact graph<br>
+    <div class='panel'>
+      <svg id='contact_graph'></svg>
     </div>
   </div>
   <div id='3d'></div>
@@ -127,7 +137,13 @@ var rainbow = d3.scale.category20(),
 
     overlay,
     cm = d3.select('#contact_map'),
+    cg = d3.select('#contact_graph'),
+    force,
+    nodes = [],
+    links = [],
+    linked = {},
     cmSize = 200,
+    cgSize = 200,
     width = window.innerWidth,
     height = window.innerHeight,
 
@@ -206,8 +222,18 @@ function loadPDB(resolution) {
           all[bin].rap[d].ratio = parseFloat(split[4])
         }
       }
+      for (var i = 0; i < all.length; i++) {
+        var bin = all[i]
+        bin.contacts = []
+        for (var j = 0; j < all.length; j++) {
+          if (i == j) continue
+          var bin2 = all[j]
+          bin.contacts.push(distanceToSquared(bin.x3, bin.y3, bin.z3, bin2.x3, bin2.y3, bin2.z3))
+        }
+      }
       init()
       showPDB(all, resolution)
+      makeGraph(all)
     })
 }
 
@@ -292,6 +318,35 @@ function showPDB(data, resolution) {
 
 }
 
+function makeGraph(data) {
+  nodes = data.slice(0, 1000)
+
+  for (var i = 0; i < nodes.length; i++) {
+    var bin = nodes[i]
+    for (var j = 0; j < nodes.length; j++) {
+      if (bin.contacts[j] < 2 && linked[j] == null) {
+        links.push({'source': i, 'target': j, 'distance': bin.contacts[j]})
+        linked[i] = true
+      }
+    }
+  }
+
+  var link = cg.select('.floor').selectAll('.link')
+    .data(links).enter().append('line')
+    .attr('stroke', '#666')
+    .attr('class', 'link')
+
+  var node = cg.select('.floor').selectAll('.node')
+    .data(nodes)
+  var nodeEnter = node.enter().append('g')
+    .attr('class', function(d,i){ return 'node node' + i })
+  nodeEnter.append('circle')
+    .attr('fill', function(d){ return d.color == null ? '#fff' : d.color })
+    .attr('r', 2)
+
+  force.nodes(nodes).links(links).start()
+}
+
 function toggleChromosome(i) {
   return function() {
     chromosomes[i].visible = !chromosomes[i].visible
@@ -352,6 +407,16 @@ function crossCM(chromosomeX, binX, chromosomeY, binY) {
   cm.select('.crossX').attr('y1', y).attr('y2', y)
 }
 
+function colorGraph(chromosome, bin) {
+  var nodes = force.nodes()
+  var index = binToIndex(chromosome, bin)
+  if (index < nodes.length) {
+    cg.select('.floor').transition()
+      .attr('transform', 'translate(' + (-nodes[index].x + (cgSize / 2)) + ',' + (-nodes[index].y + (cgSize / 2)) + ')')
+    cg.select('.node' + index).select('circle').transition().attr('fill', '#ff0000')
+  }
+}
+
 function colorGenes() {
   for (var i = 0; i < segments.length; i++) {
     var total = bufferGeometry[i].attributes.position.count
@@ -385,129 +450,6 @@ function colorGenes() {
     bufferGeometry[i].attributes.color = new THREE.BufferAttribute(colors, 3)
     bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
   }
-}
-
-function addSpider(chr, body, legs) {
-  var spider = new THREE.Object3D()
-  // var positions = genome.children[0].geometry.attributes.position.array
-  var positions = arrays[chr].position
-  geometry = new THREE.BoxGeometry(30, 30, 30, 2, 2, 2)
-  bodyMesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({color: 0xff0000}))
-  bodyMesh = new THREE.EdgesHelper(bodyMesh, 0xff0606)
-  bodyMesh.position.set(positions[body].x, positions[body].y, positions[body].z)
-  bodyMesh.matrixAutoUpdate = true
-  spider.add(bodyMesh)
-  for (var i = 0; i < legs.length; i++) {
-    legMesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({color: 0xffffff}))
-    legMesh = new THREE.EdgesHelper(legMesh, 0xfffffff)
-    legMesh.matrixAutoUpdate = true
-    legMesh.position.set(positions[legs[i]].x, positions[legs[i]].y, positions[legs[i]].z)
-    spider.add(legMesh)
-    var lineGeometry = new THREE.Geometry()
-    lineGeometry.vertices.push(bodyMesh.position)
-    lineGeometry.vertices.push(legMesh.position)
-    line = new THREE.Line(lineGeometry, new THREE.LineBasicMaterial({color: 0xffffff, opacity: 0.5}))
-    spider.add(line)
-  }
-  spider.chromosome = chr
-  spiders.push(spider)
-  genome.add(spiders[spiders.length - 1])
-  var label = overlay.append('text')
-    .text("| 0" + spiders.length)
-    .attr('x', width / 2 + 100)
-    .attr('y', height / 2 - 200 + (spiders.length * 50))
-    .attr('fill', '#ffffff')
-    .attr('class', 'label')
-  labels.push(label)
-  var line = overlay.append('line')
-    .attr('x1', width / 2 - 5 + 100)
-    .attr('y1',  height / 2 - 200 + (spiders.length * 50) - 5)
-    .attr('x2', 0)
-    .attr('y2', 0)
-    .attr('opacity', 0.5)
-    .attr('stroke', '#fff')
-    .attr('class', 'pointer')
-  lines.push({
-    'line': line,
-    'v': spiders[spiders.length - 1].children[0],
-  })
-}
-
-function makeGraph() {
-  var nodes = []
-  var links = []
-  var wires = []
-  for (var s = 0; s < spiders.length; s++) {
-    var spider = spiders[s]
-    var head = spider.children[0]
-    var h = nodes.length
-    var previous = head
-    nodes.push({'type': 0, 'child': spider.children[0], 'attributes': arrays[spider.chromosome].attributes[0]})
-    wires.push({'source': wires.length, 'target': nodes.length - 1})
-    for (var c = 1; c < spider.children.length; c++) {
-      var child = spider.children[c]
-      if (child.type == 'Line') continue
-      nodes.push({'type': 1, 'child': spider.children[c], 'attributes': arrays[spider.chromosome].attributes[c]})
-      // links.push({'type': 0, 'source': h, 'target': nodes.length - 1, 'distance': head.position.distanceToSquared(child.position)})
-      links.push({'type': 1, 'source': nodes.length - 2, 'target': nodes.length - 1, 'distance': previous.position.distanceToSquared(child.position)})
-      previous = child
-    }
-    for (var x = 0; x < nodes.length; x++) {
-      for (var y = 0; y < 6; y++) {
-        if (x < nodes.length - y) links.push({'type': 0, 'source': x, 'target': x + y, 'distance': nodes[x].child.position.distanceToSquared(nodes[x + y].child.position)})
-        if (x > y) links.push({'type': 0, 'source': x, 'target': x - y, 'distance': nodes[x].child.position.distanceToSquared(nodes[x - y].child.position)})
-      }
-    }
-    links.push({'type': 2, 'source': 0, 'target': nodes.length - 1, 'distance': 20000 })
-  }
-  var force = d3.layout.force()
-    .nodes(nodes)
-    .links(links)
-    .size([width / 2, height])
-    .linkStrength(10.0)
-    .linkDistance(function(d){ return d.distance / 2000.0 })
-    .charge(-500)
-    .gravity(0.3)
-  var node = d3.select('#overlay').selectAll('.node')
-    .data(nodes)
-  var nodeEnter = node.enter().append('g')
-    .attr('class', 'node')
-  nodeEnter.append('rect')
-    .attr('width', 5)
-    .attr('height', 5)
-    .attr('x', -2.5)
-    .attr('y', -2.5)
-    .attr('fill', 'none')
-    .attr('stroke', function(d){ return d.type == 0 ? '#ff0000' : '#fff' })
-  var link = d3.select('#layer1').selectAll('.link')
-    .data(links).enter().append('line')
-    .attr('opacity', function(d){ return d.type == 0 ? 0.1 : 1.0 })
-    .attr('stroke', function(d){
-      switch (d.type) {
-        case 0: return '#fff'
-        case 1: return '#fb0'
-        case 2: return '#000'
-      }
-    })
-    .attr('class', 'link')
-  var wire = d3.select('#overlay').selectAll('.wire')
-    .data(wires).enter().append('line')
-    .attr('stroke', '#fff')
-    .attr('opacity', 0.5)
-    .attr('class', 'wire')
-  force.on('tick', function(){
-    d3.selectAll('.node').attr('transform', function(d){ return 'translate(' + (d.x + width/2) + ',' + d.y + ')' })
-    d3.selectAll('.link')
-      .attr('x1', function(d){ return d.source.x + width/2 })
-      .attr('x2', function(d){ return d.target.x + width/2 })
-      .attr('y1', function(d){ return d.source.y })
-      .attr('y2', function(d){ return d.target.y })
-    d3.selectAll('.wire')
-      .attr('x1', function(d){ return labels[d.source].attr('x') })
-      .attr('y1', function(d){ return labels[d.source].attr('y') - 5 })
-      .attr('x2', function(d){ return nodes[d.target].x + width/2 })
-      .attr('y2', function(d){ return nodes[d.target].y })
-  }).start()
 }
 
 function init() {
@@ -554,12 +496,15 @@ function init() {
     .attr('id', 'overlay')
   layer1 = overlay.append('g').attr('id', 'layer1')
 
+  cg.append('g').attr('class', 'floor')
+
   var bins = segments[segments.length - 1][1] - 1
   for (var i = 0; i < segments.length; i++) {
     var start = segments[i][0] / bins * cmSize
     var end = segments[i][1] / bins * cmSize
     cm.append('rect')
-      .attr('fill', '#666')
+      .attr('fill', '#000')
+      .attr('stroke', '#666')
       .attr('x', start)
       .attr('y', start)
       .attr('width', end - start)
@@ -576,6 +521,21 @@ function init() {
     .attr('y1', 0)
     .attr('y2', 200)
     .attr('class', 'crossY')
+
+  force = d3.layout.force()
+    .size([cgSize, cgSize])
+    // .linkStrength(10.0)
+    .linkDistance(function(d){ return d.distance })
+    .charge(-10)
+    // .gravity(0.3)
+    .on('tick', function() {
+      d3.selectAll('.node').attr('transform', function(d){ return 'translate(' + d.x + ',' + d.y + ')' })
+      d3.selectAll('.link')
+        .attr('x1', function(d){ return d.source.x })
+        .attr('y1', function(d){ return d.source.y })
+        .attr('x2', function(d){ return d.target.x })
+        .attr('y2', function(d){ return d.target.y })
+    })
 
   animate()
 
@@ -654,6 +614,7 @@ function onDocumentMouseMove(event) {
     var bin = parseInt(faceIndex / total * bins)
     colorBin(chromosome, bin, d3.rgb(255,0,0))
     crossCM(chromosome, bin, chromosome, bin)
+    colorGraph(chromosome, bin)
     firebox.position.copy(intersection.point)
     fireflight[fireIndex] = intersection.object
     fireflies[fireIndex].position.copy(intersection.point)
@@ -661,7 +622,10 @@ function onDocumentMouseMove(event) {
     fireIndex = (fireIndex + 1) % fireflies.length
     toggle = 0
   }
+}
 
+function distanceToSquared(x1, y1, z1, x2, y2, z2) {
+  return Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2)
 }
 
 </script>

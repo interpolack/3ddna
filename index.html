@@ -126,7 +126,7 @@ void main() {
 
 var rainbow = d3.scale.category20(),
     coloration = 'none',
-    genome = new THREE.Object3D(),
+    genome,
     chromosomes = {},
     segments,
     arrays,
@@ -144,6 +144,7 @@ var rainbow = d3.scale.category20(),
     linked = {},
     cmSize = 200,
     cgSize = 200,
+    graphCap = 1000,
     width = window.innerWidth,
     height = window.innerHeight,
 
@@ -159,12 +160,14 @@ var rainbow = d3.scale.category20(),
     fireflies = [],
     fireflight = [],
     fireIndex = 0,
-    firebox,
-    fireplane
+
+    launch = true
 
 var stats = new Stats()
 stats.showPanel(1)
 document.body.appendChild(stats.dom)
+
+loadPDB('1Mb')
 
 function loadPDB(resolution) {
   all = []
@@ -222,18 +225,17 @@ function loadPDB(resolution) {
           all[bin].rap[d].ratio = parseFloat(split[4])
         }
       }
-      for (var i = 0; i < all.length; i++) {
+      for (var i = 0; i < graphCap; i++) {
         var bin = all[i]
         bin.contacts = []
-        for (var j = 0; j < all.length; j++) {
+        for (var j = 0; j < graphCap; j++) {
           if (i == j) continue
           var bin2 = all[j]
           bin.contacts.push(distanceToSquared(bin.x3, bin.y3, bin.z3, bin2.x3, bin2.y3, bin2.z3))
         }
       }
-      init()
+      if (launch) init()
       showPDB(all, resolution)
-      makeGraph(all)
     })
 }
 
@@ -261,16 +263,22 @@ $('#coloration input').click(function(){
   colorGenes()
 })
 
-loadPDB('1Mb')
-
 function showPDB(data, resolution) {
 
   $('#chromosomes').empty()
   scene.remove(genome)
+  genome = new THREE.Object3D()
   chromosomes = []
   d3.selectAll('.label,.pointer').remove()
   spiders = []
   lines = []
+  nodes = []
+  links = []
+  linked = {}
+  cg.selectAll('.node,.link').remove()
+  fireflies = []
+  fireflight = []
+  fireIndex = 0
 
   for (var i = 0; i < segments.length; i++) {
     var segment = segments[i]
@@ -314,12 +322,23 @@ function showPDB(data, resolution) {
   }
   scene.add(genome)
 
-  camera.position.z = resolution == '1Mb' ? 20 : 6000
+  geometry = new THREE.SphereGeometry(0.1, 32, 32)
+  material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  for (var i = 9; i < 40; i++) {
+    var firefly = new THREE.Mesh(geometry, material)
+    fireflies.push(firefly)
+    fireflight.push(null)
+    genome.add(firefly)
+  }
+
+  camera.position.z = resolution == '1Mb' ? 20 : 60
+
+  makeGraph(all.slice(0, graphCap))
 
 }
 
 function makeGraph(data) {
-  nodes = data.slice(0, 1000)
+  nodes = data
 
   for (var i = 0; i < nodes.length; i++) {
     var bin = nodes[i]
@@ -401,10 +420,10 @@ function crossCM(chromosomeX, binX, chromosomeY, binY) {
   var bins = segments[segments.length - 1][1]
 
   var x = binToIndex(chromosomeX, binX) / bins * cmSize
-  cm.select('.crossY').attr('x1', x).attr('x2', x)
+  cm.select('.crossY').transition().attr('x1', x).attr('x2', x)
 
   var y = binToIndex(chromosomeY, binX) / bins * cmSize
-  cm.select('.crossX').attr('y1', y).attr('y2', y)
+  cm.select('.crossX').transition().attr('y1', y).attr('y2', y)
 }
 
 function colorGraph(chromosome, bin) {
@@ -454,6 +473,8 @@ function colorGenes() {
 
 function init() {
 
+  launch = false
+
   scene = new THREE.Scene()
   camera = new THREE.PerspectiveCamera(75, width / height, 1, 20000)
   camera.position.z = 3000
@@ -465,23 +486,6 @@ function init() {
 
   raycaster = new THREE.Raycaster()
   mouse = new THREE.Vector2()
-  var geometry = new THREE.CubeGeometry(100, 100, 800, 2, 2, 2)
-  var material = new THREE.MeshBasicMaterial({wireframe: true, color: 0xff0000, shading: THREE.FlatShading})
-  firebox = new THREE.Mesh(geometry, material)
-  // console.log(firebox)
-  // scene.add(firebox)
-  var geometry = new THREE.PlaneGeometry(4000, 4000, 2, 2)
-  fireplane = new THREE.Mesh(geometry, material)
-  // scene.add(fireplane)
-
-  var geometry = new THREE.SphereGeometry(0.1, 32, 32)
-
-  for (var i = 9; i < 40; i++) {
-    var firefly = new THREE.Mesh(geometry, material)
-    fireflies.push(firefly)
-    fireflight.push(null)
-    genome.add(firefly)
-  }
 
   renderer = new THREE.WebGLRenderer()
   renderer.setSize(width, height)
@@ -615,7 +619,6 @@ function onDocumentMouseMove(event) {
     colorBin(chromosome, bin, d3.rgb(255,0,0))
     crossCM(chromosome, bin, chromosome, bin)
     colorGraph(chromosome, bin)
-    firebox.position.copy(intersection.point)
     fireflight[fireIndex] = intersection.object
     fireflies[fireIndex].position.copy(intersection.point)
     fireflies[fireIndex].scale.set(1, 1, 1)

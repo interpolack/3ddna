@@ -238,10 +238,10 @@ function loadPDB(resolution) {
           all[bin].rap[d].ratio = parseFloat(split[4])
         }
       }
-      for (var i = 0; i < graphCap; i++) {
+      for (var i = 0; i < all.length; i++) {
         var bin = all[i]
         bin.contacts = []
-        for (var j = 0; j < graphCap; j++) {
+        for (var j = 0; j < all.length; j++) {
           if (i == j) continue
           var bin2 = all[j]
           bin.contacts.push(distanceToSquared(bin.x3, bin.y3, bin.z3, bin2.x3, bin2.y3, bin2.z3))
@@ -249,6 +249,7 @@ function loadPDB(resolution) {
       }
       if (launch) init()
       showPDB(all, resolution)
+      heatCM(all)
     })
 }
 
@@ -272,7 +273,7 @@ $('#contact_map').on('mousemove', function(e){
   cm.select('.crossX').attr('y1', my).attr('y2', my)
   cm.select('.crossY').attr('x1', mx).attr('x2', mx)
   var contact = showContact(binA[0], binA[1], binB[0], binB[1])
-  colorCM(mx, my, contact)
+  // colorCM(mx, my, contact)
 })
 $('#coloration input').click(function(){
   coloration = $(this).val()
@@ -459,6 +460,54 @@ function showContact(chromosomeA, binA, chromosomeB, binB) {
   return distanceToSquared(positionA[0], positionA[1], positionA[2], positionB[0], positionB[1], positionB[2])
 }
 
+function heatCM(data) {
+  var res = 10
+  var bins = parseInt((segments[segments.length - 1][1] - 1) / res)
+  for (var i = 0; i < res; i++) {
+    for (var j = 0; j < res; j++) {
+      var sum = 0
+      for (var x = i * bins; x < (i + 1) * bins; x++) {
+        for (var y = j * bins; y < (j + 1) * bins; y++) {
+          sum += all[x].contacts[y]
+        }
+      }
+      cm.append('rect')
+        .attr('width', cmSize / res)
+        .attr('height', cmSize / res)
+        .attr('x', i * res * 2)
+        .attr('y', j * res * 2)
+        .attr('fill', d3.rgb(255 - (sum / 200000), 255 - (sum / 200000), 255 - (sum / 200000)))
+    }
+  }
+  var bins = segments[segments.length - 1][1] - 1
+  for (var i = 0; i < segments.length; i++) {
+    var start = segments[i][0] / bins * cmSize
+    var end = segments[i][1] / bins * cmSize
+    cm.append('rect')
+      .attr('fill', '#000')
+      .attr('stroke', '#666')
+      .attr('x', start)
+      .attr('y', start)
+      .attr('width', end - start)
+      .attr('height', end - start)
+      .attr('chromosome', function(d,i){ return i })
+      .attr('class', 'chromosome')
+      .on('click', toggleChromosome(i))
+  }
+  cm.append('line')
+    .attr('stroke', '#fff')
+    .attr('x1', 0)
+    .attr('x2', 200)
+    .attr('class', 'crossX')
+    .attr('pointer-events', 'none')
+  cm.append('line')
+    .attr('stroke', '#fff')
+    .attr('y1', 0)
+    .attr('y2', 200)
+    .attr('class', 'crossY')
+    .attr('pointer-events', 'none')
+}
+
 function crossCM(chromosomeA, binA, chromosomeB, binB) {
   var bins = segments[segments.length - 1][1]
 
@@ -596,34 +645,6 @@ function init() {
   cg.append('g').attr('class', 'floor')
     .append('line').attr('class', 'fireLine').attr('stroke', '#ff0000')
       .datum({'source': 0, 'target': 0})
-
-  var bins = segments[segments.length - 1][1] - 1
-  for (var i = 0; i < segments.length; i++) {
-    var start = segments[i][0] / bins * cmSize
-    var end = segments[i][1] / bins * cmSize
-    cm.append('rect')
-      .attr('fill', '#000')
-      .attr('stroke', '#666')
-      .attr('x', start)
-      .attr('y', start)
-      .attr('width', end - start)
-      .attr('height', end - start)
-      .attr('chromosome', function(d,i){ return i })
-      .attr('class', 'chromosome')
-      .on('click', toggleChromosome(i))
-  }
-  cm.append('line')
-    .attr('stroke', '#fff')
-    .attr('x1', 0)
-    .attr('x2', 200)
-    .attr('class', 'crossX')
-    .attr('pointer-events', 'none')
-  cm.append('line')
-    .attr('stroke', '#fff')
-    .attr('y1', 0)
-    .attr('y2', 200)
-    .attr('class', 'crossY')
-    .attr('pointer-events', 'none')
 
   force = d3.layout.force()
     .size([cgSize, cgSize])

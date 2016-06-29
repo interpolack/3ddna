@@ -271,7 +271,8 @@ $('#contact_map').on('mousemove', function(e){
   var binB = indexToBin(y)
   cm.select('.crossX').attr('y1', my).attr('y2', my)
   cm.select('.crossY').attr('x1', mx).attr('x2', mx)
-  showContact(binA[0], binA[1], binB[0], binB[1])
+  var contact = showContact(binA[0], binA[1], binB[0], binB[1])
+  colorCM(mx, my, contact)
 })
 $('#coloration input').click(function(){
   coloration = $(this).val()
@@ -455,6 +456,7 @@ function showContact(chromosomeA, binA, chromosomeB, binB) {
       .attr('x2', nodeB.x)
       .attr('y2', nodeB.y)
   }
+  return distanceToSquared(positionA[0], positionA[1], positionA[2], positionB[0], positionB[1], positionB[2])
 }
 
 function crossCM(chromosomeA, binA, chromosomeB, binB) {
@@ -467,13 +469,21 @@ function crossCM(chromosomeA, binA, chromosomeB, binB) {
   cm.select('.crossX').transition().attr('y1', y).attr('y2', y)
 }
 
+function colorCM(x, y, contact) {
+  cm.append('rect')
+    .attr('width', 1)
+    .attr('height', 1)
+    .attr('x', x)
+    .attr('y', y)
+    .attr('fill', d3.rgb((400 - contact) / 400 * 255, 0, 0))
+}
+
 function moveGraph(chromosome, bin) {
   var nodes = force.nodes()
   var index = binToIndex(chromosome, bin)
   if (index < nodes.length) {
     cg.select('.floor').transition()
       .attr('transform', 'translate(' + (-nodes[index].x + (cgSize / 2)) + ',' + (-nodes[index].y + (cgSize / 2)) + ')')
-    return
   }
 }
 

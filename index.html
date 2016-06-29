@@ -154,6 +154,8 @@ var rainbow = d3.scale.category20(),
     cmSize = 200,
     cgSize = 200,
     graphCap = 1000,
+    graphThreshold = 2,
+    mapCap,
     width = window.innerWidth,
     height = window.innerHeight,
 
@@ -238,10 +240,11 @@ function loadPDB(resolution) {
           all[bin].rap[d].ratio = parseFloat(split[4])
         }
       }
-      for (var i = 0; i < all.length; i++) {
+      mapCap = resolution == '1Mb' ? all.length : graphCap
+      for (var i = 0; i < mapCap; i++) {
         var bin = all[i]
         bin.contacts = []
-        for (var j = 0; j < all.length; j++) {
+        for (var j = 0; j < mapCap; j++) {
           if (i == j) continue
           var bin2 = all[j]
           bin.contacts.push(distanceToSquared(bin.x3, bin.y3, bin.z3, bin2.x3, bin2.y3, bin2.z3))
@@ -293,6 +296,7 @@ function showPDB(data, resolution) {
   links = []
   linked = {}
   cg.selectAll('.node,.link').remove()
+  cm.selectAll('.heat').remove()
   fireflies = []
   fireflight = []
   fireIndex = 0
@@ -367,7 +371,7 @@ function makeGraph(data) {
   for (var i = 0; i < nodes.length; i++) {
     var bin = nodes[i]
     for (var j = 0; j < nodes.length; j++) {
-      if (bin.contacts[j] < 2 && linked[j] == null) {
+      if (bin.contacts[j] < graphThreshold && linked[j] == null) {
         links.push({'source': i, 'target': j, 'distance': bin.contacts[j]})
         linked[i] = true
       }
@@ -467,7 +471,9 @@ function heatCM(data) {
     for (var j = 0; j < res; j++) {
       var sum = 0
       for (var x = i * bins; x < (i + 1) * bins; x++) {
+        if (x >= mapCap) continue
         for (var y = j * bins; y < (j + 1) * bins; y++) {
+          if (y >= mapCap) continue
           sum += all[x].contacts[y]
         }
       }
@@ -477,6 +483,7 @@ function heatCM(data) {
         .attr('x', i * res * 2)
         .attr('y', j * res * 2)
         .attr('fill', d3.rgb(255 - (sum / 200000), 255 - (sum / 200000), 255 - (sum / 200000)))
+        .attr('class', 'heat')
     }
   }
   var bins = segments[segments.length - 1][1] - 1

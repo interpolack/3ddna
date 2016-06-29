@@ -298,7 +298,7 @@ function showPDB(data, resolution) {
     bufferGeometry[i] = new THREE.BufferGeometry().fromGeometry(geometry)
     var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
     var colors = new Float32Array(bufferGeometry[i].attributes.position.count * 3)
-    var color = d3.rgb(255, 178, 5)
+    var color = d3.rgb(255, 255, 255)
     for (var v = 0; v < bufferGeometry[i].attributes.position.count; v++) {
       alphas[v] = 0.5
       colors[(v * 3)] = color.r / 255
@@ -442,8 +442,9 @@ function colorGenes() {
     var colors = new Float32Array(total * 3)
     var alphas = new Float32Array(total)
     var color
-    var divisor = total / (segments[i][1] - segments[i][0])
-    if (coloration == 'none') color = d3.rgb(255, 178, 5)
+    var bins = segments[i][1] - segments[i][0]
+    var divisor = total / bins
+    if (coloration == 'none') color = d3.rgb(255, 255, 255)
     else color = d3.rgb(rainbow(i))
     for (var v = 0; v < total; v++) {
       var bin = segments[i][0] + Math.floor(v / divisor)
@@ -468,6 +469,29 @@ function colorGenes() {
     }
     bufferGeometry[i].attributes.color = new THREE.BufferAttribute(colors, 3)
     bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+  }
+  if (coloration == 'none') {
+    cm.selectAll('.chromosome').attr('stroke', '#666')
+    cg.selectAll('.node').select('circle').attr('fill', '#fff')
+  } else if (coloration == 'chromosomal') {
+    cm.selectAll('.chromosome').attr('stroke', function(d,i){ return rainbow(i)})
+    cg.selectAll('.node').select('circle')
+      .attr('fill', function(d){ return rainbow(d.chromosome) })
+  } else if (coloration == 'lamina') {
+    cm.selectAll('.chromosome').attr('stroke', '#666')
+    cg.selectAll('.node').select('circle')
+      .attr('fill', function(d){ return d.lamina ? '#0f0' : '#f00' })
+  } else if (coloration == 'spectral') {
+    cm.selectAll('.chromosome').attr('stroke', '#666')
+    cg.selectAll('.node').select('circle')
+      .attr('fill', function(d,i){
+        var ratio = (i - segments[d.chromosome][0] - 1) / (segments[d.chromosome][1] - segments[d.chromosome][0])
+        return d3.rgb(ratio * 255, (1 - ratio) * 255, (1 - ratio) * 255)
+      })
+  } else if (coloration == 'xist') {
+    cm.selectAll('.chromosome').attr('stroke', '#666')
+    cg.selectAll('.node').select('circle')
+      .attr('fill', function(d){ return d.rap[0].ratio > 1 ? '#0f0' : '#f00' })
   }
 }
 
@@ -513,6 +537,8 @@ function init() {
       .attr('y', start)
       .attr('width', end - start)
       .attr('height', end - start)
+      .attr('chromosome', function(d,i){ return i })
+      .attr('class', 'chromosome')
       .on('click', toggleChromosome(i))
   }
   cm.append('line')

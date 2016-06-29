@@ -447,7 +447,7 @@ function showContact(chromosomeA, binA, chromosomeB, binB) {
   var nodeA = nodes[binToIndex(chromosomeA, binA)]
   var nodeB = nodes[binToIndex(chromosomeB, binB)]
   if (nodeA != null && nodeB != null) {
-    colorGraph(chromosomeA, binA)
+    moveGraph(chromosomeA, binA)
     cg.select('.fireLine')
       .datum({'source': nodeA, 'target': nodeB})
       .attr('x1', nodeA.x)
@@ -467,13 +467,22 @@ function crossCM(chromosomeA, binA, chromosomeB, binB) {
   cm.select('.crossX').transition().attr('y1', y).attr('y2', y)
 }
 
-function colorGraph(chromosome, bin) {
+function moveGraph(chromosome, bin) {
   var nodes = force.nodes()
   var index = binToIndex(chromosome, bin)
   if (index < nodes.length) {
     cg.select('.floor').transition()
       .attr('transform', 'translate(' + (-nodes[index].x + (cgSize / 2)) + ',' + (-nodes[index].y + (cgSize / 2)) + ')')
+    return
+  }
+}
+
+function colorGraph(chromosome, bin) {
+  var nodes = force.nodes()
+  var index = binToIndex(chromosome, bin)
+  if (index < nodes.length) {
     cg.select('.node' + index).select('circle').transition().attr('fill', '#ff0000')
+    return
   }
 }
 
@@ -708,20 +717,23 @@ function onDocumentMouseMove(event) {
   var intersections = raycaster.intersectObjects(genome.children)
   var intersection = ( intersections.length ) > 0 ? intersections[ 0 ] : null
 
-  if (shifting && toggle > 0.02 && intersection !== null && intersection.object.visible && intersection.object.name !== "") {
+  if (toggle > 0.02 && intersection !== null && intersection.object.visible && intersection.object.name !== "") {
     var chromosome = intersection.object.name
     var faceIndex = intersection.faceIndex
     var total = bufferGeometry[chromosome].attributes.alpha.count
     var bins = segments[chromosome][1] - segments[chromosome][0]
     var bin = parseInt(faceIndex / total * bins)
-    colorBin(chromosome, bin, d3.rgb(255,0,0))
     crossCM(chromosome, bin, chromosome, bin)
-    colorGraph(chromosome, bin)
-    fireflight[fireIndex] = intersection.object
-    fireflies[fireIndex].position.copy(intersection.point)
-    fireflies[fireIndex].scale.set(1, 1, 1)
-    fireIndex = (fireIndex + 1) % fireflies.length
-    toggle = 0
+    moveGraph(chromosome, bin)
+    if (shifting) {
+      colorBin(chromosome, bin, d3.rgb(255,0,0))
+      colorGraph(chromosome, bin)
+      fireflight[fireIndex] = intersection.object
+      fireflies[fireIndex].position.copy(intersection.point)
+      fireflies[fireIndex].scale.set(1, 1, 1)
+      fireIndex = (fireIndex + 1) % fireflies.length
+      toggle = 0
+    }
   }
 }
 

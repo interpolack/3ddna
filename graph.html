@@ -34,6 +34,12 @@ html, body {
   margin: 0;
   padding: 0;
 }
+.node {
+  cursor: pointer;
+}
+.link {
+  cursor: pointer;
+}
 </style>
 <body>
   <div id='graph'>
@@ -87,7 +93,7 @@ var rainbow = d3.scale.category20(),
     launch = true
 
 var zoom = d3.behavior.zoom()
-  .scaleExtent([1, 10])
+  .scaleExtent([1, 20])
   .on("zoom", zoomed)
 
 var drag = d3.behavior.drag()
@@ -178,7 +184,7 @@ function loadPDB(resolution) {
       }
       console.log(chromosomes)
       if (launch) init()
-      graphChromosomes()
+      graphGenome()
     })
 }
 
@@ -188,63 +194,69 @@ function init() {
   graph.svg = d3.select('#graph').append('svg')
     .attr('width', width / 2)
     .attr('height', height)
-  graph.container = graph.svg.append('g').call(zoom)
-  graph.container.append('rect')
+  graph.floor = graph.svg.append('g').call(zoom)
+  graph.floor.append('rect')
     .attr('width', width / 2)
     .attr('height', height)
     .attr('opacity', 0)
-  graph.layer2 = graph.svg.append('g')
-  graph.layer1 = graph.layer2.append('g')
+  graph.container = graph.svg.append('g')
+  graph.layer1 = graph.container.append('g')
+  graph.layer2 = graph.container.append('g')
 
   window.addEventListener('resize', onWindowResize, false)
 
 }
 
-function graphChromosomes() {
-  var gc = graph.chromosomes = {}
-  // gc.force = d3.layout.force()
-  //   .size([width / 2, height])
-  //   .linkDistance(function(d){ return Math.sqrt(d.distance) / 3 })
-  gc.force = d3.layout.force()
+function graphGenome() {
+  var gg = graph.genome = {}
+  gg.force = d3.layout.force()
     .size([width / 2, height])
     .charge(-300)
     .linkStrength(function(d){ return Math.sqrt(d.distance) / 500 })
-  gc.nodes = chromosomes
-  gc.links = []
-  gc.linked = {}
+  gg.nodes = chromosomes
+  gg.links = []
+  gg.linked = {}
 
-  for (var i = 0; i < gc.nodes.length; i++) {
-    var chromosome = gc.nodes[i]
-    for (var j = 0; j < gc.nodes.length; j++) {
-      if (chromosome.contacts[j] < 10000 && gc.linked[j] == null) {
-        gc.links.push({'source': i, 'target': j, 'distance': chromosome.contacts[j]})
-        gc.linked[i] = true
+  for (var i = 0; i < gg.nodes.length; i++) {
+    var chromosome = gg.nodes[i]
+    for (var j = 0; j < gg.nodes.length; j++) {
+      if (chromosome.contacts[j] < 10000 && gg.linked[j] == null) {
+        gg.links.push({'source': i, 'target': j, 'distance': chromosome.contacts[j]})
+        gg.linked[i] = true
       }
     }
   }
 
   var node = graph.layer2.selectAll('.node')
-    .data(gc.nodes)
+    .data(gg.nodes)
   var nodeEnter = node.enter().append('g')
-    .attr('class', 'node')
+    .attr('class', 'node chromosome')
   nodeEnter.append('circle')
-    .attr('r', 5)
-    .attr('stroke', function(d,i){ return rainbow(i) })
+    .attr('r', 8)
+    .attr('stroke', '#333')
     .attr('stroke-width', 3)
-    .attr('fill', '#444')
+    .attr('fill', function(d,i){ return rainbow(i) })
+  nodeEnter.append('text')
+    .text(function(d,i){ return (i % 20) == 19 ? "X" : (i % 20) + 1 })
+    .attr('fill', '#333')
+    .attr('font-size', '8px')
+    .attr('y', 3)
+    .attr('text-anchor', 'middle')
+    .attr('font-weight', 700)
 
   var link = graph.layer1.selectAll('.link')
-    .data(gc.links).enter().append('line')
+    .data(gg.links).enter().append('line')
     .attr('stroke-width', 2)
-    .attr('stroke', '#444')
-    .attr('class', 'link')
+    .attr('stroke', '#555')
+    .attr('opacity', 1)
+    .attr('class', 'link interchromosomal')
 
-  gc.force
-    .nodes(gc.nodes)
-    .links(gc.links)
+  gg.force
+    .nodes(gg.nodes)
+    .links(gg.links)
     .start()
-  for (var i = 0; i < Math.pow(gc.nodes.length, 2); i++) gc.force.tick()
-  gc.force.stop()
+  for (var i = 0; i < Math.pow(gg.nodes.length, 2); i++) gg.force.tick()
+  gg.force.stop()
   node
     .attr('transform', function(d,i){ return 'translate(' + d.x + ',' + d.y + ')'})
   link
@@ -254,11 +266,15 @@ function graphChromosomes() {
     .attr('y2', function(d){ return d.target.y })
 }
 
+function graphChromosomes(chromosomes) {
+  console.log(chromosomes)
+}
+
 function onWindowResize() {
   width = window.innerWidth
   height = window.innerHeight
   graph.attr('width', width / 2).attr('height', height)
-  gc.force.size([width / 2, height])
+  gg.force.size([width / 2, height])
 }
 
 function distanceToSquared(x1, y1, z1, x2, y2, z2) {
@@ -266,20 +282,27 @@ function distanceToSquared(x1, y1, z1, x2, y2, z2) {
 }
 
 function zoomed() {
-  graph.layer2.attr('transform', 'translate(' + d3.event.translate + ")scale(" + d3.event.scale + ')');
+  graph.container.selectAll('.chromosome').selectAll('circle,text').attr('transform', 'scale(' + ((6 - d3.event.scale) / 5) + ')').attr('opacity', (5 - d3.event.scale) / 4)
+  graph.container.selectAll('.interchromosomal').attr('opacity', (5 - d3.event.scale) / 4)
+  graph.container.attr('transform', 'translate(' + d3.event.translate + ')scale(' + d3.event.scale + ')')
+  if (d3.event.scale > 7) {
+    var chromosomes = []
+    console.log(graph.genome.nodes)
+    graphChromosomes(chromosomes)
+  }
 }
 
 function dragstarted(d) {
-  d3.event.sourceEvent.stopPropagation();
-  d3.select(this).classed('dragging', true);
+  d3.event.sourceEvent.stopPropagation()
+  d3.select(this).classed('dragging', true)
 }
 
 function dragged(d) {
-  d3.select(this).attr('cx', d.x = d3.event.x).attr("cy", d.y = d3.event.y);
+  d3.select(this).attr('cx', d.x = d3.event.x).attr("cy", d.y = d3.event.y)
 }
 
 function dragended(d) {
-  d3.select(this).classed('dragging', false);
+  d3.select(this).classed('dragging', false)
 }
 
 </script>

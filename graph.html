@@ -3,6 +3,7 @@
 <script src='js/jquery.js'></script>
 <script src='js/d3.js'></script>
 <script src='js/CanvasRenderer.js'></script>
+<script src='js/TrackballControls.js'></script>
 <script src='js/Projector.js'></script>
 <script src='js/stats.js'></script>
 <script src='js/queue.js'></script>
@@ -14,112 +15,100 @@ html, body {
   color: #ffffff;
   text-transform: uppercase;
   font-size: 10px;
-  background-color: #000;
-}
-#controls {
-  padding: 10px;
-  background: none;
-  position: absolute;
-}
-#controls .border {
-  border: 2px solid #fff;
-  border-radius: 3px;
-  width: 10px;
-  height: 10px;
-  margin: 2px;
-  padding: 0;
-  float: left;
-  cursor: pointer;
 }
 #graph {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  float: left;
+  display: inline-block;
+  width: 50%;
+  height: 100%;
+  background-color: #333;
+  margin: 0;
+  padding: 0;
+}
+#model {
+  float: left;
+  display: inline-block;
+  width: 50%;
+  height: 100%;
+  background-color: #000;
+  margin: 0;
+  padding: 0;
 }
 </style>
 <body>
-  <svg id='graph'></svg>
-  <div id='controls'>
-    <form id='resolution'>
-      resolution<br>
-      <input id='1Mb' type="radio" name="resolution" value="1Mb" checked> 1Mb
-      <input id='40kb' type="radio" name="resolution" value="40kb"> 40kb
-    </form>
-    <form id='hour'>
-      hour<br>
-      <input id='0' type="radio" name="hour" value="0" checked> 0
-      <input id='1' type="radio" name="hour" value="1"> 1
-      <input id='1' type="radio" name="hour" value="2"> 2
-      <input id='1' type="radio" name="hour" value="3"> 3
-      <input id='1' type="radio" name="hour" value="4"> 6
-    </form>
+  <div id='graph'>
+  </div>
+  <div id='model'>
   </div>
 </body>
+<script type='x-shader/x-vertex' id='vertexShader'>
+varying vec2 vUv;
+varying float noise;
+attribute float alpha;
+varying float vAlpha;
+varying vec3 vColor;
+void main() {
+  vAlpha = alpha;
+  vUv = uv;
+  vColor = color;
+  gl_PointSize = 1.1;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+</script>
+<script type="x-shader/x-fragment" id="fragmentShader">
+varying vec2 vUv;
+varying float noise;
+varying float vAlpha;
+varying vec3 vColor;
+uniform vec3 colorsa;
+void main() {
+  gl_FragColor = vec4(vColor, vAlpha);
+}
+</script>
 <script>
 
-var resolution = '1Mb',
-    hour = 0,
+var rainbow = d3.scale.category20(),
+
+    cgSize = 300,
+    graphCap = 1000,
+    graphThreshold = 4,
+    mapCap,
+
+    graph = {},
+    width = window.innerWidth,
+    height = window.innerHeight,
 
     all = [],
-    pdb,
-    pml,
-    rap,
+    pdb = [],
+    segments = [],
+    rap = [],
+    chromosomes = [],
 
-    nodes,
-    links = [],
+    launch = true
 
-    width = window.innerWidth,
-    height = window.innerHeight
+var zoom = d3.behavior.zoom()
+  .scaleExtent([1, 10])
+  .on("zoom", zoomed)
 
-$('#hour input').click(function(){
-  hour = parseInt($(this).val())
-  force.start()
-})
+var drag = d3.behavior.drag()
+  .origin(function(d) { return d; })
+  .on("dragstart", dragstarted)
+  .on("drag", dragged)
+  .on("dragend", dragended)
 
-var svg = d3.select('#graph')
-  .attr('width', width)
-  .attr('height', height)
-var layers = [svg.append('g'), svg.append('g'), svg.append('g')]
+var stats = new Stats()
+stats.showPanel(1)
+document.body.appendChild(stats.dom)
 
-var force = d3.layout.force()
-  .size([width, height])
-  .charge(-20)
-  .linkStrength(0.3)
-  .linkDistance(5)
-  .on('tick', function(e) {
-    var k = e.alpha * 0.1
-    d3.selectAll('.node')
-      .each(function(o,j){
-        // o.x += (width / 2 + (o.x3 - 100) * 100 - o.x) * k
-        // o.y += (height / 2 + (o.y3 - 110) * 100 - o.y) * k
+loadPDB('1Mb')
 
-        if (o.rap[hour].ratio != null) o.x += (width / 2 + (o.rap[hour].ratio) * 10 - 500 - o.x) * k
-        else o.x += (width / 2 + (0) * 10 - 500 - o.x) * k
-      })
-      .attr('transform', function(d){ return 'translate(' + d.x + ',' + d.y + ')' })
-    d3.selectAll('.link')
-      .attr('x1', function(d){ return d.source.x })
-      .attr('y1', function(d){ return d.source.y })
-      .attr('x2', function(d){ return d.target.x })
-      .attr('y2', function(d){ return d.target.y })
-  })
+function loadPDB(resolution) {
+  all = []
+  pdb = []
+  segments = []
+  rap = []
+  chromosomes = []
 
-function requestData(url, callback) {
-  var req = new XMLHttpRequest
-  req.open("GET", url, true)
-  req.setRequestHeader("Accept", "application/json")
-  req.onreadystatechange = function() {
-    if (req.readyState === 4) {
-      if (req.status < 300) callback(null, JSON.parse(req.responseText))
-      else callback(req.status)
-    }
-  }
-  req.send(null)
-}
-
-function loadGenome(resolution) {
   var q = queue(1)
   q.defer(d3.text, 'data/Model_' + resolution + '.pdb')
   q.defer(d3.text, 'data/Model_' + resolution + '.pml')
@@ -129,9 +118,31 @@ function loadGenome(resolution) {
   q.defer(d3.text, 'data/3hr-Xist_' + resolution)
   q.defer(d3.text, 'data/6hr-Xist_' + resolution)
   q.awaitAll(function(error, results){
+      segments = results[1].split('\n')
+      for (var i = segments.length - 1; i >= 0; i--) {
+        var line = segments[i]
+        if (line.substring(0, 6) != "select") segments.splice(i, 1)
+        else {
+          var split = segments[i].split(' ')[2].split('-')
+          segments[i] = [parseInt(split[0]), parseInt(split[1])]
+        }
+      }
+      segments.reverse()
+      var length = segments.length
+      var last = segments[length - 1][1] - 1
+      for (var i = 0; i < length; i++) {
+        chromosomes.push({
+          'chromosome': i,
+          'contacts': new Array(resolution == '40kb' ? length * 2 : length)
+        })
+        if (resolution == '40kb') segments.push([segments[i][0] + last, segments[i][1] + last])
+      }
       pdb = results[0].split('\n')
+      chromosome = 0
       for (var i = 0; i < pdb.length - 1; i++) {
+        if (i > segments[chromosome][1]) chromosome++
         all.push({
+          'chromosome': chromosome,
           'bin': i,
           'x3': parseFloat(pdb[i].substring(31,37)),
           'y3': parseFloat(pdb[i].substring(38,45)),
@@ -140,16 +151,6 @@ function loadGenome(resolution) {
           'rap': {0: {}, 1: {}, 2: {}, 3: {}, 4: {}}
         })
       }
-      pml = results[1].split('\n')
-      for (var i = pml.length - 1; i >= 0; i--) {
-        var line = pml[i]
-        if (line.substring(0, 6) != "select") pml.splice(i, 1)
-        else {
-          var split = pml[i].split(' ')[2].split('-')
-          pml[i] = [parseInt(split[0]), parseInt(split[1])]
-        }
-      }
-      pml.reverse()
       for (var d = 0; d < 5; d++) {
         rap = results[d + 2].split('\n')
         for (var i = 0; i < rap.length - 1; i++) {
@@ -160,40 +161,126 @@ function loadGenome(resolution) {
           all[bin].rap[d].ratio = parseFloat(split[4])
         }
       }
-      graphBins(chromosome(0))
+      mapCap = resolution == '1Mb' ? all.length : graphCap
+      for (var a = 0; a < mapCap; a++) {
+        var binA = all[a]
+        binA.contacts = []
+        var bins = segments[binA.chromosome][1] - segments[binA.chromosome][0]
+        for (var b = 0; b < mapCap; b++) {
+          if (a == b) continue
+          var binB = all[b]
+          var distance = distanceToSquared(binA.x3, binA.y3, binA.z3, binB.x3, binB.y3, binB.z3)
+          binA.contacts.push(distance)
+
+          var ic = chromosomes[binA.chromosome].contacts[binB.chromosome]
+          chromosomes[binA.chromosome].contacts[binB.chromosome] = ic == null ? 0 : ic + (distance / bins)
+        }
+      }
+      console.log(chromosomes)
+      if (launch) init()
+      graphChromosomes()
     })
 }
 
-function graphBins(data) {
-  nodes = data
-  var node = layers[1].selectAll('.node')
-    .data(nodes)
+function init() {
+  launch = false
+
+  graph.svg = d3.select('#graph').append('svg')
+    .attr('width', width / 2)
+    .attr('height', height)
+  graph.container = graph.svg.append('g').call(zoom)
+  graph.container.append('rect')
+    .attr('width', width / 2)
+    .attr('height', height)
+    .attr('opacity', 0)
+  graph.layer2 = graph.svg.append('g')
+  graph.layer1 = graph.layer2.append('g')
+
+  window.addEventListener('resize', onWindowResize, false)
+
+}
+
+function graphChromosomes() {
+  var gc = graph.chromosomes = {}
+  // gc.force = d3.layout.force()
+  //   .size([width / 2, height])
+  //   .linkDistance(function(d){ return Math.sqrt(d.distance) / 3 })
+  gc.force = d3.layout.force()
+    .size([width / 2, height])
+    .charge(-300)
+    .linkStrength(function(d){ return Math.sqrt(d.distance) / 500 })
+  gc.nodes = chromosomes
+  gc.links = []
+  gc.linked = {}
+
+  for (var i = 0; i < gc.nodes.length; i++) {
+    var chromosome = gc.nodes[i]
+    for (var j = 0; j < gc.nodes.length; j++) {
+      if (chromosome.contacts[j] < 10000 && gc.linked[j] == null) {
+        gc.links.push({'source': i, 'target': j, 'distance': chromosome.contacts[j]})
+        gc.linked[i] = true
+      }
+    }
+  }
+
+  var node = graph.layer2.selectAll('.node')
+    .data(gc.nodes)
   var nodeEnter = node.enter().append('g')
     .attr('class', 'node')
   nodeEnter.append('circle')
-    .attr('r', function(d){ return (d.z3 - 80) / 10 })
-    .attr('fill', function(d){ return d.lamina ? '#0f0' : '#f00' })
+    .attr('r', 5)
+    .attr('stroke', function(d,i){ return rainbow(i) })
+    .attr('stroke-width', 3)
+    .attr('fill', '#444')
 
-  for (var i = 0; i < 1; i++) {
-    for (var j = pml[i][0] - 1; j < pml[i][1] - 2; j++) {
-      links.push({'source': j, 'target': j + 1})
-    }
-  }
-  var link = layers[0].selectAll('.link')
-    .data(links)
-    .enter()
-    .append('line')
-    .attr('stroke', '#666')
+  var link = graph.layer1.selectAll('.link')
+    .data(gc.links).enter().append('line')
+    .attr('stroke-width', 2)
+    .attr('stroke', '#444')
     .attr('class', 'link')
 
-  force.nodes(nodes).links(links).start()
+  gc.force
+    .nodes(gc.nodes)
+    .links(gc.links)
+    .start()
+  for (var i = 0; i < Math.pow(gc.nodes.length, 2); i++) gc.force.tick()
+  gc.force.stop()
+  node
+    .attr('transform', function(d,i){ return 'translate(' + d.x + ',' + d.y + ')'})
+  link
+    .attr('x1', function(d){ return d.source.x })
+    .attr('y1', function(d){ return d.source.y })
+    .attr('x2', function(d){ return d.target.x })
+    .attr('y2', function(d){ return d.target.y })
 }
 
-function chromosome(id) {
-  return all.slice(pml[id][0] - 1, pml[id][1] - 1)
+function onWindowResize() {
+  width = window.innerWidth
+  height = window.innerHeight
+  graph.attr('width', width / 2).attr('height', height)
+  gc.force.size([width / 2, height])
 }
 
-loadGenome(resolution)
+function distanceToSquared(x1, y1, z1, x2, y2, z2) {
+  return Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2)
+}
+
+function zoomed() {
+  graph.layer2.attr('transform', 'translate(' + d3.event.translate + ")scale(" + d3.event.scale + ')');
+}
+
+function dragstarted(d) {
+  d3.event.sourceEvent.stopPropagation();
+  d3.select(this).classed('dragging', true);
+}
+
+function dragged(d) {
+  d3.select(this).attr('cx', d.x = d3.event.x).attr("cy", d.y = d3.event.y);
+}
+
+function dragended(d) {
+  d3.select(this).classed('dragging', false);
+}
 
 </script>
 </html>

@@ -92,7 +92,7 @@ var rainbow = d3.scale.category20(),
 
     mouse = {'x': 0, 'y': 0},
 
-    zoomToBin = 5,
+    zoomToBin = 10,
     graphed = false,
     launch = true
 
@@ -145,7 +145,7 @@ function loadPDB(resolution) {
           'chromosome': i,
           'contacts': new Array(resolution == '40kb' ? length * 2 : length)
         })
-        if (resolution == '40kb') segments.push([segments[i][0] + last, segments[i][1] + last])
+        if (resolution == '40kb') segments.push([segments[i][0] + last - 1, segments[i][1] + last - 1])
       }
       pdb = results[0].split('\n')
       chromosome = 0
@@ -171,12 +171,11 @@ function loadPDB(resolution) {
           all[bin].rap[d].ratio = parseFloat(split[4])
         }
       }
-      mapCap = resolution == '1Mb' ? all.length : graphCap
-      for (var a = 0; a < mapCap; a++) {
+      for (var a = 0; a < all.length; a++) {
         var binA = all[a]
         binA.contacts = []
         var bins = segments[binA.chromosome][1] - segments[binA.chromosome][0]
-        for (var b = 0; b < mapCap; b++) {
+        for (var b = 0; b < all.length; b++) {
           if (a == b) continue
           var binB = all[b]
           var distance = distanceToSquared(binA.x3, binA.y3, binA.z3, binB.x3, binB.y3, binB.z3)
@@ -292,15 +291,13 @@ function graphChromosomes(chromosomes) {
     }
   }
 
-  console.log(chromosomes)
-  console.log(cg.nodes.length)
-
   for (var i = 0; i < cg.nodes.length; i++) {
     var bin = cg.nodes[i]
     for (var j = 0; j < cg.nodes.length; j++) {
-      if (bin.contacts[j] < 10 && cg.linked[j] == null) {
-        cg.links.push({'source': i, 'target': j, 'distance': bin.contacts[j]})
-        cg.linked[i] = true
+      var con = cg.nodes[j].bin
+      if (bin.contacts[con] < 4 && cg.linked[con] == null) {
+        cg.links.push({'source': i, 'target': j, 'distance': bin.contacts[con]})
+        cg.linked[bin.bin] = true
       }
     }
   }

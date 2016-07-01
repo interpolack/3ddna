@@ -92,7 +92,7 @@ var rainbow = d3.scale.category20(),
 
     mouse = {'x': 0, 'y': 0},
 
-    zoomToBin = 7,
+    zoomToBin = 5,
     graphed = false,
     launch = true
 
@@ -279,23 +279,26 @@ function graphChromosomes(chromosomes) {
   var cg = graph.chromosomes = {}
   cg.force = d3.layout.force()
     .size([width / 2, height])
-    .linkDistance(function(d){ return d.distance })
+    .linkDistance(function(d){ return d.distance * 3 })
     .charge(-10)
   cg.nodes = []
   cg.links = []
   cg.linked = {}
 
   for (var i = 0; i < chromosomes.length; i++) {
-    var segment = segments[i]
+    var segment = segments[chromosomes[i]]
     for (var j = segment[0] - 1; j < segment[1] - 1; j++) {
       cg.nodes.push(all[j])
     }
   }
 
+  console.log(chromosomes)
+  console.log(cg.nodes.length)
+
   for (var i = 0; i < cg.nodes.length; i++) {
     var bin = cg.nodes[i]
     for (var j = 0; j < cg.nodes.length; j++) {
-      if (bin.contacts[j] < 4 && cg.linked[j] == null) {
+      if (bin.contacts[j] < 10 && cg.linked[j] == null) {
         cg.links.push({'source': i, 'target': j, 'distance': bin.contacts[j]})
         cg.linked[i] = true
       }
@@ -309,14 +312,14 @@ function graphChromosomes(chromosomes) {
   nodeEnter.append('circle')
     .attr('r', 3)
     .attr('stroke', '#333')
-    .attr('stroke-width', 3)
-    .attr('fill', '#fff')
+    .attr('stroke-width', 2)
+    .attr('fill', function(d){ return rainbow(d.chromosome) })
 
   var link = graph.layer3.selectAll('.link')
     .data(cg.links).enter().append('line')
-    .attr('stroke-width', 2)
+    .attr('stroke-width', 1)
     .attr('stroke', '#fff')
-    .attr('opacity', 1)
+    .attr('opacity', 0.2)
     .attr('class', 'link interbin')
 
   cg.force

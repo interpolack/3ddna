@@ -15,8 +15,9 @@ html, body {
   color: #ffffff;
   text-transform: uppercase;
   font-size: 10px;
+  background-color: #000;
 }
-#graph {
+#left {
   float: left;
   display: inline-block;
   width: 50%;
@@ -25,13 +26,26 @@ html, body {
   margin: 0;
   padding: 0;
 }
+#graph {
+  width: 100%;
+  height: 100%;
+  border-bottom: 1px solid #000;
+  overflow: hidden;
+}
+#matrix {
+  width: 200px;
+  height: 200px;
+  overflow: hidden;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+}
 #model {
   float: left;
   display: inline-block;
   width: 50%;
   height: 100%;
   background-color: #000;
-  margin: 0;
   padding: 0;
 }
 .node {
@@ -42,7 +56,11 @@ html, body {
 }
 </style>
 <body>
-  <div id='graph'>
+  <div id='matrix'>
+  </div>
+  <div id='left'>
+    <div id='graph'>
+    </div>
   </div>
   <div id='model'>
   </div>
@@ -75,6 +93,7 @@ void main() {
 
 var rainbow = d3.scale.category20(),
 
+    resolution = '1Mb',
     cgSize = 300,
     graphCap = 1000,
     graphThreshold = 4,
@@ -82,17 +101,26 @@ var rainbow = d3.scale.category20(),
 
     graph = {},
     width = window.innerWidth,
+    initialWidth = window.innerWidth,
     height = window.innerHeight,
+    initialHeight = window.innerHeight,
 
     all = [],
     pdb = [],
     segments = [],
     rap = [],
     chromosomes = [],
+    bufferGeometry = [],
+
+    scene,
+    camera,
+    renderer,
+    controls,
+    genome,
 
     mouse = {'x': 0, 'y': 0},
 
-    zoomToBin = 10,
+    zoomToBin = 8,
     graphed = false,
     launch = true
 
@@ -134,18 +162,18 @@ function loadPDB(resolution) {
         if (line.substring(0, 6) != "select") segments.splice(i, 1)
         else {
           var split = segments[i].split(' ')[2].split('-')
-          segments[i] = [parseInt(split[0]), parseInt(split[1])]
+          segments[i] = [parseInt(split[0]) - 1, parseInt(split[1]) - 1]
         }
       }
       segments.reverse()
       var length = segments.length
-      var last = segments[length - 1][1] - 1
+      var last = segments[length - 1][1]
       for (var i = 0; i < length; i++) {
         chromosomes.push({
           'chromosome': i,
           'contacts': new Array(resolution == '40kb' ? length * 2 : length)
         })
-        if (resolution == '40kb') segments.push([segments[i][0] + last - 1, segments[i][1] + last - 1])
+        if (resolution == '40kb') segments.push([segments[i][0] + last, segments[i][1] + last])
       }
       pdb = results[0].split('\n')
       chromosome = 0
@@ -174,7 +202,6 @@ function loadPDB(resolution) {
       for (var a = 0; a < all.length; a++) {
         var binA = all[a]
         binA.contacts = []
-        var bins = segments[binA.chromosome][1] - segments[binA.chromosome][0]
         for (var b = 0; b < all.length; b++) {
           if (a == b) continue
           var binB = all[b]
@@ -182,11 +209,28 @@ function loadPDB(resolution) {
           binA.contacts.push(distance)
 
           var ic = chromosomes[binA.chromosome].contacts[binB.chromosome]
-          chromosomes[binA.chromosome].contacts[binB.chromosome] = ic == null ? 0 : ic + (distance / bins)
+          chromosomes[binA.chromosome].contacts[binB.chromosome] = ic == null ? 0 : ic + distance
+        }
+      }
+      var max = 0
+      for (var i = 0; i < chromosomes.length; i++) {
+        var bins = segments[i][1] - segments[i][0]
+        if (bins > max) max = bins
+      }
+      for (var i = 0; i < chromosomes.length; i++) {
+        var binsA = segments[i][1] - segments[i][0]
+        chromosomes[i].normalized = []
+        chromosomes[i].weighted = []
+        for (var j = 0; j < chromosomes[i].contacts.length; j++) {
+          var binsB = segments[j][1] - segments[j][0]
+          chromosomes[i].normalized.push(chromosomes[i].contacts[j] / max)
+          chromosomes[i].weighted.push(chromosomes[i].contacts[j] / (binsA + binsB))
         }
       }
       if (launch) init()
+      plotGenome()
       graphGenome()
+      modelGenome()
     })
 }
 
@@ -207,9 +251,99 @@ function init() {
   graph.layer3 = graph.svg.append('g')
   graph.layer4 = graph.svg.append('g')
 
+  matrix.svg = d3.select('#matrix').append('svg')
+    .attr('width', 200)
+    .attr('height', 200)
+  matrix.layer1 = matrix.svg.append('g')
+  matrix.layer2 = matrix.svg.append('g')
+
+  scene = new THREE.Scene()
+  camera = new THREE.PerspectiveCamera(75, width / height / 2, 1, 20000)
+  camera.position.z = 3000
+  scene.add(camera)
+  renderer = new THREE.WebGLRenderer()
+  renderer.setSize(width / 2, height)
+  d3.select('#model')[0][0].appendChild(renderer.domElement)
+  controls = new THREE.TrackballControls(camera, renderer.domElement)
+
   window.addEventListener('resize', onWindowResize, false)
   document.addEventListener('mousemove', onDocumentMouseMove, false)
 
+  animate()
+
+}
+
+function modelGenome() {
+
+  scene.remove(genome)
+  genome = new THREE.Object3D()
+  chromosomes = []
+
+  for (var i = 0; i < segments.length; i++) {
+    var segment = segments[i]
+    var curve = new THREE.CatmullRomCurve3(
+      all.slice(segment[0], segment[1]).map(function(values, bin){
+        return new THREE.Vector3((values.x3 - 100), (values.y3 - 100), (values.z3 - 100))
+      })
+    )
+
+    var geometry = new THREE.TubeGeometry(
+      curve,  //path
+      (segments[i % segments.length][1] - segments[i % segments.length][0]) * (resolution == '1Mb' ? 5 : 2),    //segments
+      resolution == '1Mb' ? 0.05 : 0.1,     //radius
+      3,     //radiusSegments
+      false  //closed
+    )
+    bufferGeometry[i] = new THREE.BufferGeometry().fromGeometry(geometry)
+    var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
+    var colors = new Float32Array(bufferGeometry[i].attributes.position.count * 3)
+    var color = d3.rgb(rainbow(i))
+    for (var v = 0; v < bufferGeometry[i].attributes.position.count; v++) {
+      alphas[v] = 0.8
+      colors[(v * 3)] = color.r / 255
+      colors[(v * 3) + 1] = color.g / 255
+      colors[(v * 3) + 2] = color.b / 255
+    }
+    bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+    bufferGeometry[i].attributes.color = new THREE.BufferAttribute(colors, 3)
+    material = new THREE.ShaderMaterial({
+      vertexShader: document.getElementById('vertexShader').textContent,
+      fragmentShader: document.getElementById('fragmentShader').textContent,
+      vertexColors: THREE.VertexColors,
+      transparent: true,
+    })
+    chromosomes[i] = new THREE.Mesh(bufferGeometry[i], material)
+    chromosomes[i].name = i
+    genome.add(chromosomes[i])
+  }
+  scene.add(genome)
+
+  camera.position.z = resolution == '1Mb' ? 40 : 60
+
+}
+
+function plotGenome() {
+  var size = 200 / 40
+
+  var mg = matrix.genome = {}
+
+  var row = matrix.layer1.selectAll('.row')
+    .data(chromosomes)
+  var rowEnter = row.enter().append('g')
+    .attr('transform', function(d,i){ return 'translate(0,' + (d.chromosome * size) + ')' })
+    .attr('class', 'row')
+  rowEnter.each(function(d){
+    var rowThis = d3.select(this)
+    d.weighted.forEach(function(contact,c){
+      contact = 255 - contact / 20
+      rowThis.append('rect')
+        .attr('width', size)
+        .attr('height', size)
+        .attr('y', 0)
+        .attr('x', c * size)
+        .attr('fill', d.chromosome == c ? rainbow(c) : d3.rgb(contact, contact, contact))
+    })
+  })
 }
 
 function graphGenome() {
@@ -225,8 +359,8 @@ function graphGenome() {
   for (var i = 0; i < gg.nodes.length; i++) {
     var chromosome = gg.nodes[i]
     for (var j = 0; j < gg.nodes.length; j++) {
-      if (chromosome.contacts[j] < 10000 && gg.linked[j] == null) {
-        gg.links.push({'source': i, 'target': j, 'distance': chromosome.contacts[j]})
+      if (chromosome.normalized[j] < 8000 && gg.linked[j] == null) {
+        gg.links.push({'source': i, 'target': j, 'distance': chromosome.normalized[j]})
         gg.linked[i] = true
       }
     }
@@ -248,6 +382,24 @@ function graphGenome() {
     .attr('y', 3)
     .attr('text-anchor', 'middle')
     .attr('font-weight', 700)
+  nodeEnter.on('mouseover', function(d){
+    d3.selectAll('.chromosome').attr('opacity', 0.2)
+    d3.select(this).attr('opacity', 1)
+    for (var i = 0; i < segments.length; i++) {
+      var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
+      if (i == d.chromosome) for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 1.0
+      else for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.2
+      bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+    }
+  })
+  nodeEnter.on('mouseout', function(d){
+    d3.selectAll('.chromosome').attr('opacity', 1)
+    for (var i = 0; i < segments.length; i++) {
+      var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
+      for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.8
+      bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+    }
+  })
 
   var link = graph.layer1.selectAll('.link')
     .data(gg.links).enter().append('line')
@@ -277,7 +429,7 @@ function graphChromosomes(chromosomes) {
   graphed = true
   var cg = graph.chromosomes = {}
   cg.force = d3.layout.force()
-    .size([width / 2, height])
+    .size([width / 2, height / 2])
     .linkDistance(function(d){ return d.distance * 3 })
     .charge(-10)
   cg.nodes = []
@@ -286,7 +438,7 @@ function graphChromosomes(chromosomes) {
 
   for (var i = 0; i < chromosomes.length; i++) {
     var segment = segments[chromosomes[i]]
-    for (var j = segment[0] - 1; j < segment[1] - 1; j++) {
+    for (var j = segment[0]; j < segment[1]; j++) {
       cg.nodes.push(all[j])
     }
   }
@@ -295,7 +447,7 @@ function graphChromosomes(chromosomes) {
     var bin = cg.nodes[i]
     for (var j = 0; j < cg.nodes.length; j++) {
       var con = cg.nodes[j].bin
-      if (bin.contacts[con] < 4 && cg.linked[con] == null) {
+      if (bin.contacts[con] < 5 && cg.linked[con] == null) {
         cg.links.push({'source': i, 'target': j, 'distance': bin.contacts[con]})
         cg.linked[bin.bin] = true
       }
@@ -335,20 +487,34 @@ function graphChromosomes(chromosomes) {
 
 }
 
+function animate() {
+  requestAnimationFrame(animate)
+  stats.begin()
+  controls.update()
+  render()
+  stats.end()
+}
+
+function render() {
+  renderer.render(scene, camera)
+}
+
 function onWindowResize() {
   width = window.innerWidth
   height = window.innerHeight
-  graph.attr('width', width / 2).attr('height', height)
-  gg.force.size([width / 2, height])
+  graph.container.attr('transform', 'translate(' + ((width - initialWidth) / 4) + ',0)scale(' + (height / initialHeight) + ')')
+  graph.svg.attr('width', width / 2).attr('height', height)
+  // graph.genome.force.size([width / 2, height])
+  camera.aspect = width / height / 2
+  camera.updateProjectionMatrix()
+  renderer.setSize(width / 2, height)
 }
-
 
 function onDocumentMouseMove(event) {
   event.preventDefault()
   mouse.x = event.clientX
   mouse.y = event.clientY
 }
-
 
 function distanceToSquared(x1, y1, z1, x2, y2, z2) {
   return Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2)

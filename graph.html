@@ -259,7 +259,7 @@ function loadPDB(resolution) {
         rap = results[d + 2].split('\n')
         for (var i = 0; i < rap.length - 1; i++) {
           var split = rap[i].split('\t')
-          var bin = parseInt(split[1]) / (resolution == '1Mb' ? 1000000 : 40000)
+          var bin = segments[parseInt(split[0]) - 1][0] + (parseInt(split[1]) / (resolution == '1Mb' ? 1000000 : 40000))
           all[bin]['rap' + d] = parseFloat(split[4])
         }
       }

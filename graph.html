@@ -17,6 +17,15 @@ html, body {
   font-size: 10px;
   background-color: #000;
 }
+#controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 10px;
+}
+  #controls span {
+    font-size: 20px;
+  }
 #left {
   float: left;
   display: inline-block;
@@ -47,6 +56,7 @@ html, body {
   height: 100%;
   background-color: #000;
   padding: 0;
+  overflow: hidden;
 }
 .node {
   cursor: pointer;
@@ -56,6 +66,14 @@ html, body {
 }
 </style>
 <body>
+  <div id='controls'>
+    <span>&ocir; </span> <select>
+      <option>chromosome</option>
+    </select><br>
+    <span>&origof; </span> <select>
+      <option>sum distances / sum bins</option>
+    </select><br>
+  </div>
   <div id='matrix'>
   </div>
   <div id='left'>
@@ -111,6 +129,8 @@ var rainbow = d3.scale.category20(),
     rap = [],
     chromosomes = [],
     bufferGeometry = [],
+
+    pinned = 0,
 
     scene,
     camera,
@@ -212,18 +232,11 @@ function loadPDB(resolution) {
           chromosomes[binA.chromosome].contacts[binB.chromosome] = ic == null ? 0 : ic + distance
         }
       }
-      var max = 0
-      for (var i = 0; i < chromosomes.length; i++) {
-        var bins = segments[i][1] - segments[i][0]
-        if (bins > max) max = bins
-      }
       for (var i = 0; i < chromosomes.length; i++) {
         var binsA = segments[i][1] - segments[i][0]
-        chromosomes[i].normalized = []
-        chromosomes[i].weighted = []
+        chromosomes[i].weighted = [] // this is fair but isolates non-localized chromosomes (like active X)
         for (var j = 0; j < chromosomes[i].contacts.length; j++) {
           var binsB = segments[j][1] - segments[j][0]
-          chromosomes[i].normalized.push(chromosomes[i].contacts[j] / max)
           chromosomes[i].weighted.push(chromosomes[i].contacts[j] / (binsA + binsB))
         }
       }
@@ -359,8 +372,8 @@ function graphGenome() {
   for (var i = 0; i < gg.nodes.length; i++) {
     var chromosome = gg.nodes[i]
     for (var j = 0; j < gg.nodes.length; j++) {
-      if (chromosome.normalized[j] < 8000 && gg.linked[j] == null) {
-        gg.links.push({'source': i, 'target': j, 'distance': chromosome.normalized[j]})
+      if (chromosome.weighted[j] < 6000 && gg.linked[j] == null) {
+        gg.links.push({'source': i, 'target': j, 'distance': chromosome.weighted[j]})
         gg.linked[i] = true
       }
     }
@@ -383,22 +396,31 @@ function graphGenome() {
     .attr('text-anchor', 'middle')
     .attr('font-weight', 700)
   nodeEnter.on('mouseover', function(d){
-    d3.selectAll('.chromosome').attr('opacity', 0.2)
+    if (pinned == 0) d3.selectAll('.chromosome').attr('opacity', 0.2)
+    else d3.selectAll('.chromosome').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
     d3.select(this).attr('opacity', 1)
     for (var i = 0; i < segments.length; i++) {
       var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
-      if (i == d.chromosome) for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 1.0
+      if (i == d.chromosome || chromosomes[i].pinned) for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.8
       else for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.2
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
   })
   nodeEnter.on('mouseout', function(d){
-    d3.selectAll('.chromosome').attr('opacity', 1)
+    if (pinned == 0) d3.selectAll('.chromosome').attr('opacity', 1)
+    else d3.selectAll('.chromosome').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
     for (var i = 0; i < segments.length; i++) {
       var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
-      for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.8
+      if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.8
+      else for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.2
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
+  })
+  nodeEnter.on('click', function(d){
+    d.pinned = !d.pinned
+    if (d.pinned) pinned++
+    else pinned--
+    chromosomes[d.chromosome] = d
   })
 
   var link = graph.layer1.selectAll('.link')

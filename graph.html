@@ -324,7 +324,7 @@ function init() {
 
   window.addEventListener('resize', onWindowResize, false)
   document.addEventListener('mousemove', onDocumentMouseMove, false)
-  document.addEventListener('keypress', onDocumentKeyPress, false)
+  document.addEventListener('keyup', onDocumentKeyUp, false)
 
   navigation.push({
     'node': 'chromosome',
@@ -333,8 +333,6 @@ function init() {
   })
 
   $('#navigation').on('click', '.nav', function(){
-    $('#navigation>.nav').addClass('inactive')
-    $(this).removeClass('inactive')
     navigate($('#navigation>.nav').index(this))
   })
 
@@ -343,6 +341,9 @@ function init() {
 }
 
 function navigate(nav) {
+  $('#navigation>.nav').addClass('inactive')
+  $('#navigation>.nav:eq(' + nav + ')').removeClass('inactive')
+
   controls.target.copy(navigation[nav].locus)
   camera.position.copy(navigation[nav].locus)
   camera.position.setZ(30)
@@ -659,15 +660,19 @@ function onDocumentMouseMove(event) {
   mouse.y = event.clientY
 }
 
-function onDocumentKeyPress(event) {
-  if (event.which != 13) return
+function onDocumentKeyUp(event) {
+  event.preventDefault()
+  if (navigated > 0 && (event.keyCode == 8 || event.keyCode == 46)) {
+    navigated--
+    navigate(navigated)
+  }
+  if (event.keyCode != 13) return
   var val = $('#search').val()
   if (val.length == 0 && pinned == 0) {
     navigate(navigation.length - 1)
   } else if (val.length > 0) {
     search(val)
   } else if (pinned > 0) {
-    event.preventDefault()
     var pin = []
     var locus
     for (var i = 0; i < chromosomes.length; i++) {
@@ -678,6 +683,9 @@ function onDocumentKeyPress(event) {
     }
     locus.divideScalar(pin.length)
 
+    $('#navigation').append("<div class='nav'><span>&acd;</span> chromosome " + pin.toString() + "</div>")
+    // &there4;
+
     navigation.push({
       'node': '1Mb',
       'link': 'distance',
@@ -686,9 +694,6 @@ function onDocumentKeyPress(event) {
     })
     navigate(navigation.length - 1)
 
-    $('#navigation>.nav').addClass('inactive')
-    $('#navigation').append("<div class='nav'><span>&acd;</span> chromosome " + pin.toString() + "</div>")
-    // &there4;
   }
 }
 

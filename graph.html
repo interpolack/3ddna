@@ -26,6 +26,9 @@ html, body {
   #controls span {
     font-size: 20px;
   }
+  #controls select {
+    width: 100px;
+  }
 #left {
   float: left;
   display: inline-block;
@@ -67,11 +70,11 @@ html, body {
 </style>
 <body>
   <div id='controls'>
-    <span>&ocir; </span> <select>
-      <option>chromosome</option>
+    <span>&ocir; </span> <select id='node'>
+      <option value='chromosome'>chromosome</option>
     </select><br>
-    <span>&origof; </span> <select>
-      <option>sum distances / sum bins</option>
+    <span>&origof; </span> <select id='link'>
+      <option value='weighted'>distance/bin</option>
     </select><br>
   </div>
   <div id='matrix'>
@@ -272,7 +275,6 @@ function init() {
 
   scene = new THREE.Scene()
   camera = new THREE.PerspectiveCamera(75, width / height / 2, 1, 20000)
-  camera.position.z = 3000
   scene.add(camera)
   renderer = new THREE.WebGLRenderer()
   renderer.setSize(width / 2, height)
@@ -281,6 +283,7 @@ function init() {
 
   window.addEventListener('resize', onWindowResize, false)
   document.addEventListener('mousemove', onDocumentMouseMove, false)
+  document.addEventListener('keypress', onDocumentKeyPress, false)
 
   animate()
 
@@ -331,7 +334,7 @@ function modelGenome() {
   }
   scene.add(genome)
 
-  camera.position.z = resolution == '1Mb' ? 40 : 60
+  camera.position.z = resolution == '1Mb' ? 30 : 60
 
 }
 
@@ -348,7 +351,7 @@ function plotGenome() {
   rowEnter.each(function(d){
     var rowThis = d3.select(this)
     d.weighted.forEach(function(contact,c){
-      contact = 255 - contact / 20
+      contact = 255 - contact / 25
       rowThis.append('rect')
         .attr('width', size)
         .attr('height', size)
@@ -448,10 +451,12 @@ function graphGenome() {
 }
 
 function graphChromosomes(chromosomes) {
+  graph.svg.selectAll('.node,.link').remove()
+
   graphed = true
   var cg = graph.chromosomes = {}
   cg.force = d3.layout.force()
-    .size([width / 2, height / 2])
+    .size([width / 2, height])
     .linkDistance(function(d){ return d.distance * 3 })
     .charge(-10)
   cg.nodes = []
@@ -476,7 +481,7 @@ function graphChromosomes(chromosomes) {
     }
   }
 
-  var node = graph.layer4.selectAll('.node')
+  var node = graph.layer2.selectAll('.node')
     .data(cg.nodes)
   var nodeEnter = node.enter().append('g')
     .attr('class', 'node bin')
@@ -486,7 +491,7 @@ function graphChromosomes(chromosomes) {
     .attr('stroke-width', 2)
     .attr('fill', function(d){ return rainbow(d.chromosome) })
 
-  var link = graph.layer3.selectAll('.link')
+  var link = graph.layer1.selectAll('.link')
     .data(cg.links).enter().append('line')
     .attr('stroke-width', 1)
     .attr('stroke', '#fff')
@@ -538,26 +543,26 @@ function onDocumentMouseMove(event) {
   mouse.y = event.clientY
 }
 
+function onDocumentKeyPress(event) {
+  if (event.which == 13 && pinned > 0) {
+    event.preventDefault()
+    var pin = []
+    for (var i = 0; i < chromosomes.length; i++) {
+      if (chromosomes[i].pinned) pin.push(i)
+    }
+    graphChromosomes(pin)
+    $('#node').append("<option value='1Mb'>1Mb</option>").val('1Mb')
+    $('#link').append("<option value='distance'>distance</option>").val('distance')
+  }
+}
+
 function distanceToSquared(x1, y1, z1, x2, y2, z2) {
   return Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2)
 }
 
 function zoomed() {
-  graph.container.selectAll('.chromosome').selectAll('circle,text').attr('transform', 'scale(' + (((zoomToBin + 2) - d3.event.scale) / (zoomToBin + 1)) + ')').attr('opacity', ((zoomToBin + 1) - d3.event.scale) / (zoomToBin))
-  graph.container.selectAll('.interchromosomal').attr('opacity', (5 - d3.event.scale) / 4)
+  graph.container.selectAll('.node').selectAll('circle,text').attr('transform', 'scale(' + (((zoomToBin + 2) - d3.event.scale) / (zoomToBin + 1)) + ')')
   graph.container.attr('transform', 'translate(' + d3.event.translate + ')scale(' + d3.event.scale + ')')
-  if (d3.event.scale > zoomToBin && !graphed) {
-    var chromosomes = []
-    for (var i = 0; i < graph.genome.nodes.length; i++) {
-      var node = graph.genome.nodes[i]
-      var pos = graph.genome.context(node.px, node.py)
-      if (pos.x < width / 2 && pos.y < height && pos.x > 0 && pos.y > 0) chromosomes.push(i)
-    }
-    graphChromosomes(chromosomes)
-  } else if (d3.event.scale <= zoomToBin && graphed) {
-    graphed = false
-    graph.svg.selectAll('.bin,.interbin').remove()
-  }
 }
 
 function dragstarted(d) {

@@ -29,6 +29,14 @@ html, body {
   #controls select {
     width: 100px;
   }
+  #search {
+    border-radius: 3px;
+    height: 18px;
+    width: 100px;
+    border: 1px solid #666;
+    color: #000;
+    padding-left: 8px;
+  }
 #navigation {
   position: absolute;
   top: 0;
@@ -96,6 +104,8 @@ html, body {
       <option value='weighted'>distance/bin</option>
       <option value='distance'>distance</option>
     </select><br>
+    <span>&xopf; </span>&nbsp;<input id='search' type='text'></input>
+    <br>
   </div>
   <div id='matrix'>
   </div>
@@ -156,9 +166,11 @@ var rainbow = d3.scale.category20(),
     chromosomes = [],
     meshes = [],
     bufferGeometry = [],
+    loaded = {},
 
     pinned = 0,
     navigation = [],
+    navigated = 0,
 
     scene,
     camera,
@@ -234,17 +246,21 @@ function loadPDB(resolution) {
           'y3': parseFloat(pdb[i].substring(38,45)),
           'z3': parseFloat(pdb[i].substring(46,53)),
           'lamina': parseInt(pdb[i].substring(61,64)),
-          'rap': {0: {}, 1: {}, 2: {}, 3: {}, 4: {}}
+          'rap0': 0.0,
+          'rap1': 0.0,
+          'rap2': 0.0,
+          'rap3': 0.0,
+          'rap4': 0.0,
         })
       }
+      loaded['lamina'] = true
       for (var d = 0; d < 5; d++) {
+        loaded['rap' + d] = true
         rap = results[d + 2].split('\n')
         for (var i = 0; i < rap.length - 1; i++) {
           var split = rap[i].split('\t')
           var bin = parseInt(split[1]) / (resolution == '1Mb' ? 1000000 : 40000)
-          all[bin].rap[d].expected = parseFloat(split[2])
-          all[bin].rap[d].actual = parseFloat(split[3])
-          all[bin].rap[d].ratio = parseFloat(split[4])
+          all[bin]['rap' + d] = parseFloat(split[4])
         }
       }
       for (var a = 0; a < all.length; a++) {
@@ -330,6 +346,7 @@ function navigate(nav) {
   controls.target.copy(navigation[nav].locus)
   camera.position.copy(navigation[nav].locus)
   camera.position.setZ(30)
+  graph.container.attr('transform', 'scale(1)')
 
   if (navigation[nav].node == 'chromosome') {
     graphGenome()
@@ -350,6 +367,38 @@ function navigate(nav) {
 
   $('#node').val(navigation[nav].node)
   $('#link').val(navigation[nav].link)
+
+  navigated = nav
+}
+
+function search(query) {
+  // TODO: remember pinned
+  if (!loaded[query]) return alert("search not found")
+
+  if (navigation[navigated].node == 'chromosome') {
+    for (var i = 0; i < chromosomes.length; i++) {
+      var segment = segments[i]
+      chromosomes[i].found = 0
+      for (var j = segment[0]; j < segment[1]; j++) {
+        chromosomes[i].found += all[j][query]
+      }
+      chromosomes[i].found /= (segment[1] - segment[0])
+    }
+    max = 0
+    for (var i = 0; i < chromosomes.length; i++) {
+      if (chromosomes[i].found > max) max = chromosomes[i].found
+    }
+    graph.svg.selectAll('.node').attr('opacity', function(d){ return d.found / max })
+    for (var i = 0; i < chromosomes.length; i++) {
+      var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
+      for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = chromosomes[i].found / max
+      bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+    }
+  } else if (navigation[navigated].node == '1Mb') {
+    for (var i = 0; i < all.length; i++) {
+
+    }
+  }
 }
 
 function modelGenome() {
@@ -611,7 +660,13 @@ function onDocumentMouseMove(event) {
 }
 
 function onDocumentKeyPress(event) {
-  if (event.which == 13 && pinned > 0) {
+  if (event.which != 13) return
+  var val = $('#search').val()
+  if (val.length == 0 && pinned == 0) {
+    navigate(navigation.length - 1)
+  } else if (val.length > 0) {
+    search(val)
+  } else if (pinned > 0) {
     event.preventDefault()
     var pin = []
     var locus

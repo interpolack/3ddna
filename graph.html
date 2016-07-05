@@ -373,6 +373,7 @@ function navigate(nav) {
 }
 
 function search(query) {
+  $('#search').val("")
   // TODO: remember pinned
   if (!loaded[query]) return alert("search not found")
 
@@ -389,10 +390,10 @@ function search(query) {
     for (var i = 0; i < chromosomes.length; i++) {
       if (chromosomes[i].found > max) max = chromosomes[i].found
     }
-    graph.svg.selectAll('.node').attr('opacity', function(d){ return d.found / max })
+    graph.svg.selectAll('.node').attr('opacity', function(d){ return d.found / max > 0.2 ? d.found / max : 0.2 })
     for (var i = 0; i < chromosomes.length; i++) {
       var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
-      for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = chromosomes[i].found / max
+      for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = chromosomes[i].found / max > 0.2 ? chromosomes[i].found / max : 0.2
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
   } else if (navigation[navigated].node == '1Mb') {
@@ -569,6 +570,8 @@ function graphGenome() {
 
 function graphChromosomes(chr) {
   graph.svg.selectAll('.node,.link').remove()
+  pinned = 0
+  for (var i = 0; i < chromosomes.length; i++) chromosomes[i].pinned = false
 
   graphed = true
   var cg = graph.chromosomes = {}
@@ -607,6 +610,47 @@ function graphChromosomes(chr) {
     .attr('stroke', '#333')
     .attr('stroke-width', 2)
     .attr('fill', function(d){ return rainbow(d.chromosome) })
+  nodeEnter.on('mouseover', function(d){
+    if (pinned == 0) d3.selectAll('.node').attr('opacity', 0.2)
+    else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+    d3.select(this).attr('opacity', 1)
+    for (var i = 0; i < chr.length; i++) {
+      var segment = segments[chr[i]]
+      var geometry = bufferGeometry[chr[i]]
+      var mesh = meshes[chr[i]]
+      var total = geometry.attributes.alpha.count
+      var bins = segment[1] - segment[0]
+      var size = parseInt(total / bins)
+      for (var j = segment[0]; j < segment[1]; j++) {
+        if (j == d.bin || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
+        else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0
+      }
+      geometry.attributes.alpha.needsUpdate = true
+    }
+  })
+  nodeEnter.on('mouseout', function(d){
+    if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
+    else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+    for (var i = 0; i < chr.length; i++) {
+      var segment = segments[chr[i]]
+      var geometry = bufferGeometry[chr[i]]
+      var mesh = meshes[chr[i]]
+      var total = geometry.attributes.alpha.count
+      var bins = segment[1] - segment[0]
+      var size = parseInt(total / bins)
+      for (var j = segment[0]; j < segment[1]; j++) {
+        if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
+        else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0
+      }
+      geometry.attributes.alpha.needsUpdate = true
+    }
+  })
+  nodeEnter.on('click', function(d){
+    d.pinned = !d.pinned
+    if (d.pinned) pinned++
+    else pinned--
+    all[d.bin] = d
+  })
 
   var link = graph.layer1.selectAll('.link')
     .data(cg.links).enter().append('line')

@@ -352,6 +352,7 @@ function navigate(nav) {
   if (navigation[nav].node == 'chromosome') {
     graphGenome()
     for (var i = 0; i < chromosomes.length; i++) {
+      meshes[i].visible = true
       var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
       for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.8
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
@@ -359,10 +360,7 @@ function navigate(nav) {
   } else if (navigation[nav].node == '1Mb') {
     graphChromosomes(navigation[nav].chromosomes)
     for (var i = 0; i < chromosomes.length; i++) {
-      var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
-      if (navigation[nav].chromosomes.indexOf(i) > -1) for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.8
-      else for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0
-      bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+      if (navigation[nav].chromosomes.indexOf(i) == -1) meshes[i].visible = false
     }
   }
 
@@ -623,7 +621,7 @@ function graphChromosomes(chr) {
       var size = parseInt(total / bins)
       for (var j = segment[0]; j < segment[1]; j++) {
         if (j == d.bin || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
-        else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0
+        else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
       }
       geometry.attributes.alpha.needsUpdate = true
     }
@@ -640,7 +638,7 @@ function graphChromosomes(chr) {
       var size = parseInt(total / bins)
       for (var j = segment[0]; j < segment[1]; j++) {
         if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
-        else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0
+        else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
       }
       geometry.attributes.alpha.needsUpdate = true
     }
@@ -723,7 +721,8 @@ function onDocumentKeyUp(event) {
       if (chromosomes[i].pinned) {
         pin.push(i)
         var center = bufferGeometry[i].boundingSphere.center
-        locus = locus == null ? center : locus.add(center)      }
+        locus = locus == null ? center : locus.add(center)
+      }
     }
     locus.divideScalar(pin.length)
 

@@ -327,6 +327,7 @@ function init() {
   document.addEventListener('keyup', onDocumentKeyUp, false)
 
   navigation.push({
+    'context': 'genome',
     'node': 'chromosome',
     'link': 'weighted',
     'locus': new THREE.Vector3(0, 0, 0),
@@ -349,19 +350,27 @@ function navigate(nav) {
   camera.position.setZ(30)
   graph.container.attr('transform', 'scale(1)')
 
-  if (navigation[nav].node == 'chromosome') {
+  if (navigation[nav].context == 'genome') {
     graphGenome()
     for (var i = 0; i < chromosomes.length; i++) {
       meshes[i].visible = true
-      var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
-      for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.8
+      var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
+      for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.8
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
-  } else if (navigation[nav].node == '1Mb') {
+  } else if (navigation[nav].context == 'chromosomes') {
     graphChromosomes(navigation[nav].chromosomes)
     for (var i = 0; i < chromosomes.length; i++) {
       if (navigation[nav].chromosomes.indexOf(i) == -1) meshes[i].visible = false
+      else {
+        meshes[i].visible = true
+        var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
+        for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.8
+        bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+      }
     }
+  } else if (navigation[nav].context == 'bins') {
+    // TODO
   }
 
   $('#node').val(navigation[nav].node)
@@ -372,10 +381,10 @@ function navigate(nav) {
 
 function search(query) {
   $('#search').val("")
-  // TODO: remember pinned
+  // TODO: pinned-specific search?
   if (!loaded[query]) return alert("search not found")
 
-  if (navigation[navigated].node == 'chromosome') {
+  if (navigation[navigated].context == 'genome') {
     for (var i = 0; i < chromosomes.length; i++) {
       var segment = segments[i]
       chromosomes[i].found = 0
@@ -390,14 +399,12 @@ function search(query) {
     }
     graph.svg.selectAll('.node').attr('opacity', function(d){ return d.found / max > 0.2 ? d.found / max : 0.2 })
     for (var i = 0; i < chromosomes.length; i++) {
-      var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
-      for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = chromosomes[i].found / max > 0.2 ? chromosomes[i].found / max : 0.2
+      var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
+      for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = chromosomes[i].found / max > 0.2 ? chromosomes[i].found / max : 0.2
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
-  } else if (navigation[navigated].node == '1Mb') {
-    for (var i = 0; i < all.length; i++) {
-
-    }
+  } else if (navigation[navigated].context == 'chromosomes') {
+    // TODO
   }
 }
 
@@ -519,9 +526,9 @@ function graphGenome() {
     else d3.selectAll('.chromosome').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
     d3.select(this).attr('opacity', 1)
     for (var i = 0; i < segments.length; i++) {
-      var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
-      if (i == d.chromosome || chromosomes[i].pinned) for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.8
-      else for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.2
+      var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
+      if (i == d.chromosome || chromosomes[i].pinned) for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.8
+      else for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.2
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
   })
@@ -529,9 +536,9 @@ function graphGenome() {
     if (pinned == 0) d3.selectAll('.chromosome').attr('opacity', 1)
     else d3.selectAll('.chromosome').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
     for (var i = 0; i < segments.length; i++) {
-      var alphas = new Float32Array(bufferGeometry[i].attributes.position.count)
-      if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.8
-      else for (var a = 0; a < bufferGeometry[i].attributes.position.count; a++) alphas[a] = 0.2
+      var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
+      if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.8
+      else for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.2
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
   })
@@ -589,6 +596,7 @@ function graphChromosomes(chr) {
   }
 
   for (var i = 0; i < cg.nodes.length; i++) {
+    cg.nodes[i].pinned = false
     var bin = cg.nodes[i]
     for (var j = 0; j < cg.nodes.length; j++) {
       var con = cg.nodes[j].bin
@@ -603,6 +611,7 @@ function graphChromosomes(chr) {
     .data(cg.nodes)
   var nodeEnter = node.enter().append('g')
     .attr('class', 'node bin')
+    .attr('opacity', function(d){ return (pinned == 0 || d.pinned) ? 1 : 0.2 })
   nodeEnter.append('circle')
     .attr('r', 3)
     .attr('stroke', '#333')
@@ -715,28 +724,61 @@ function onDocumentKeyUp(event) {
   } else if (val.length > 0) {
     search(val)
   } else if (pinned > 0) {
-    var pin = []
-    var locus
-    for (var i = 0; i < chromosomes.length; i++) {
-      if (chromosomes[i].pinned) {
-        pin.push(i)
-        var center = bufferGeometry[i].boundingSphere.center
-        locus = locus == null ? center : locus.add(center)
+
+    if (navigation[navigated].node == 'chromosome') {
+      var pin = []
+      var locus
+      for (var i = 0; i < chromosomes.length; i++) {
+        if (chromosomes[i].pinned) {
+          pin.push(i)
+          var center = bufferGeometry[i].boundingSphere.center
+          locus = locus == null ? center : locus.add(center)
+        }
       }
+      locus.divideScalar(pin.length)
+      $('#navigation').append("<div class='nav'><span>&acd;</span> chromosome " + pin.toString() + "</div>")
+      navigation.push({
+        'context': 'chromosomes',
+        'node': '1Mb',
+        'link': 'distance',
+        'chromosomes': pin,
+        'locus': locus,
+      })
+    } else if (navigation[navigated].node == '1Mb') {
+      var pin = []
+      var locus
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].pinned) {
+          pin.push(i)
+          // var geometry = bufferGeometry[all[i].chromosome]
+          // var total = geometry.attributes.position.count
+          // var segment = segments[all[i].chromosome]
+          // console.log(geometry)
+          // console.log(meshes[all[i].chromosome])
+          // var bins = segment[1] - segment[0]
+          // var size = parseInt(total / bins)
+          // var target = (all[i].bin - segment[0]) * size
+          // var center = new THREE.Vector3(
+          //   geometry.attributes.position.array[target],
+          //   geometry.attributes.position.array[target + 1],
+          //   geometry.attributes.position.array[target + 2]
+          // )
+          // locus = locus == null ? center : locus.add(center)
+        }
+      }
+      // locus.divideScalar(pin.length)
+      locus = navigation[navigated].locus
+      $('#navigation').append("<div class='nav'><span>&there4;</span> bin " + pin.toString() + "</div>")
+      navigation.push({
+        'context': 'bins',
+        'node': '1Mb',
+        'link': 'distance',
+        'chromosomes': navigation[navigated].chromosomes,
+        'bins': pin,
+        'locus': locus,
+      })
     }
-    locus.divideScalar(pin.length)
-
-    $('#navigation').append("<div class='nav'><span>&acd;</span> chromosome " + pin.toString() + "</div>")
-    // &there4;
-
-    navigation.push({
-      'node': '1Mb',
-      'link': 'distance',
-      'chromosomes': pin,
-      'locus': locus,
-    })
     navigate(navigation.length - 1)
-
   }
 }
 

@@ -829,8 +829,8 @@ function onDocumentMouseMove(event) {
   mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1
 
   if (!shifting && dragging) {
-    var a = graph.context(click.x, click.y)
-    var b = graph.context(event.clientX, event.clientY)
+    var a = {'x': click.x, 'y': click.y}
+    var b = {'x': event.clientX, 'y': event.clientY}
     var x1 = a.x < b.x ? a.x : b.x
     var x2 = a.x > b.x ? a.x : b.x
     var y1 = a.y < b.y ? a.y : b.y
@@ -881,8 +881,8 @@ function onDocumentMouseDown(event) {
 
 function onDocumentMouseUp(event) {
   if (!shifting && dragging && click.x != event.clientX && click.y != event.clientY) {
-    var a = graph.context(click.x, click.y)
-    var b = graph.context(event.clientX, event.clientY)
+    var a = {'x': click.x, 'y': click.y}
+    var b = {'x': event.clientX, 'y': event.clientY}
     var x1 = a.x < b.x ? a.x : b.x
     var x2 = a.x > b.x ? a.x : b.x
     var y1 = a.y < b.y ? a.y : b.y
@@ -890,7 +890,8 @@ function onDocumentMouseUp(event) {
     var nodes = navigation[navigated].context == 'genome' ? graph.genome.nodes : graph.chromosomes.nodes
     for (var i = 0; i < nodes.length; i++) {
       var node = nodes[i]
-      if (node.px > x1 && node.px < x2 && node.py > y1 && node.py < y2) {
+      var nc = graph.context(node.px, node.py)
+      if (nc.x > x1 && nc.x < x2 && nc.y > y1 && nc.y < y2) {
         node.pinned = true
         pinned++
       }

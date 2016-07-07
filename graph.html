@@ -115,6 +115,19 @@ html, body {
   #unpin:hover {
     color: #00c4f4;
   }
+#wireframe {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  color: #666;
+  cursor: pointer;
+}
+  #wireframe span {
+    font-size: 20px;
+  }
+  #wireframe:hover {
+    color: #00c4f4;
+  }
 </style>
 <body>
   <!-- <div id='matrix'>
@@ -137,6 +150,7 @@ html, body {
     <div id='graph'></div>
   </div>
   <div id='model'>
+    <div id='wireframe'>toggle lamina <span>&smashp;</span></div>
     <div id='navigation'>
       <div class='nav'><span>&oast;</span> genome</div>
     </div>
@@ -201,6 +215,7 @@ var rainbow = d3.scale.category20(),
     renderer,
     controls,
     genome,
+    sphere,
     raycaster = new THREE.Raycaster(),
     mouse = new THREE.Vector2(),
     click = new THREE.Vector2(),
@@ -353,6 +368,10 @@ function init() {
   d3.select('#model')[0][0].appendChild(renderer.domElement)
   controls = new THREE.TrackballControls(camera, renderer.domElement)
 
+  sphere = new THREE.Mesh(new THREE.SphereGeometry(11.5, 30, 30), new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.1 }))
+  sphere.visible = false
+  scene.add(sphere)
+
   window.addEventListener('resize', onWindowResize, false)
   document.addEventListener('mousemove', onDocumentMouseMove, false)
   document.addEventListener('mousedown', onDocumentMouseDown, false)
@@ -382,6 +401,11 @@ function init() {
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
     $(this).css('visibility', 'hidden')
+  })
+
+  $('#wireframe').on('click', function() {
+    sphere.visible = !sphere.visible
+    $(this).css('color', sphere.visible ? '#fff' : '#666')
   })
 
   animate()
@@ -884,11 +908,13 @@ function onDocumentMouseUp(event) {
     d3.selectAll('.node').attr('opacity', function(d){ return d.pinned ? 1 : 0.2 })
     graph.marquee.remove()
     $('#unpin').css('visibility', pinned == 0 ? 'hidden' : 'visible')
+    // TODO linear highlights from marquee
   }
   dragging = false
 }
 
 function onDocumentKeyDown(event) {
+  event.preventDefault()
   if (event.shiftKey) shifting = true
 }
 
@@ -910,6 +936,7 @@ function alphaModelFromGraph() {
 }
 
 function onDocumentKeyUp(event) {
+  event.preventDefault()
   if (shifting) {
     if (navigation[navigated].context == 'chromosomes') {
       if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
@@ -918,7 +945,6 @@ function onDocumentKeyUp(event) {
     }
     shifting = false
   }
-  event.preventDefault()
   if (navigated > 0 && (event.keyCode == 8 || event.keyCode == 46)) {
     navigated--
     navigate(navigated)

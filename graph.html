@@ -56,6 +56,7 @@ html, body {
     color: #00c4f4;
   }
 #left {
+  position: relative;
   float: left;
   display: inline-block;
   width: 50%;
@@ -101,27 +102,39 @@ html, body {
   left: 0;
   bottom: 0;
 }
+#unpin {
+  position: absolute;
+  width: 30px;
+  height: 20px;
+  right: 10px;
+  top: 10px;
+  font-size: 20px;
+  cursor: pointer;
+  visibility: hidden;
+}
+  #unpin:hover {
+    color: #00c4f4;
+  }
 </style>
 <body>
-  <div id='controls'>
-    <span>&ocir; </span> <select id='node'>
-      <option value='chromosome'>chromosome</option>
-      <option value='1Mb'>1Mb</option>
-    </select><br>
-    <span>&origof; </span> <select id='link'>
-      <option value='weighted'>distance/bin</option>
-      <option value='distance'>distance</option>
-    </select><br>
-    <span>&xopf; </span>&nbsp;<input id='search' type='text'></input>
-    <br>
-  </div>
   <!-- <div id='matrix'>
   </div> -->
   <div id='left'>
-    <div id='linear'>
+    <div id='controls'>
+      <span>&ocir; </span> <select id='node'>
+        <option value='chromosome'>chromosome</option>
+        <option value='1Mb'>1Mb</option>
+      </select><br>
+      <span>&origof; </span> <select id='link'>
+        <option value='weighted'>distance/bin</option>
+        <option value='distance'>distance</option>
+      </select><br>
+      <span>&xopf; </span>&nbsp;<input id='search' type='text'></input>
+      <br>
     </div>
-    <div id='graph'>
-    </div>
+    <div id='unpin'>&Cross; &cirmid;</div>
+    <div id='linear'></div>
+    <div id='graph'></div>
   </div>
   <div id='model'>
     <div id='navigation'>
@@ -358,6 +371,19 @@ function init() {
     navigate($('#navigation>.nav').index(this))
   })
 
+  $('#unpin').on('click', function() {
+    var nodes = navigation[navigated].context == 'genome' ? graph.genome.nodes : graph.chromosomes.nodes
+    for (var i = 0; i < nodes.length; i++) nodes[i].pinned = false
+    pinned = 0
+    d3.selectAll('.node').attr('opacity', 1)
+    for (var i = 0; i < chromosomes.length; i++) {
+      var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
+      for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 1
+      bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+    }
+    $(this).css('visibility', 'hidden')
+  })
+
   animate()
 
 }
@@ -379,6 +405,7 @@ function navigate(nav) {
       for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.8
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
+    $('#unpin').css('visibility', 'hidden')
   } else if (navigation[nav].context == 'chromosomes') {
     graphChromosomes(navigation[nav].chromosomes)
     for (var i = 0; i < chromosomes.length; i++) {
@@ -390,8 +417,10 @@ function navigate(nav) {
         bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
       }
     }
+    $('#unpin').css('visibility', 'hidden')
   } else if (navigation[nav].context == 'bins') {
     // TODO
+    // ? $('#unpin').css('visibility', 'hidden')
   }
 
   $('#node').val(navigation[nav].node)
@@ -578,6 +607,7 @@ function graphGenome() {
     else pinned--
     chromosomes[d.chromosome] = d
     linear.svg.selectAll('.chr' + d.chromosome + '-all').classed('pinned', d.pinned)
+    $('#unpin').css('visibility', pinned == 0 ? 'hidden' : 'visible')
   })
 
   var link = graph.layer1.selectAll('.link')
@@ -719,6 +749,7 @@ function graphChromosomes(chr) {
     else pinned--
     all[d.bin] = d
     linear.svg.selectAll('.chr' + d.chromosome + '-' + d.bin).classed('pinned', d.pinned)
+    $('#unpin').css('visibility', pinned == 0 ? 'hidden' : 'visible')
   })
 
   var link = graph.layer1.selectAll('.link')
@@ -852,6 +883,7 @@ function onDocumentMouseUp(event) {
     }
     d3.selectAll('.node').attr('opacity', function(d){ return d.pinned ? 1 : 0.2 })
     graph.marquee.remove()
+    $('#unpin').css('visibility', pinned == 0 ? 'hidden' : 'visible')
   }
   dragging = false
 }

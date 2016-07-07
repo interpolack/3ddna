@@ -190,7 +190,9 @@ var rainbow = d3.scale.category20(),
     genome,
     raycaster = new THREE.Raycaster(),
     mouse = new THREE.Vector2(),
+    click = new THREE.Vector2(),
     shifting = false,
+    dragging = false,
 
     zoomToBin = 8,
     graphed = false,
@@ -340,6 +342,8 @@ function init() {
 
   window.addEventListener('resize', onWindowResize, false)
   document.addEventListener('mousemove', onDocumentMouseMove, false)
+  document.addEventListener('mousedown', onDocumentMouseDown, false)
+  document.addEventListener('mouseup', onDocumentMouseUp, false)
   document.addEventListener('keyup', onDocumentKeyUp, false)
   document.addEventListener('keydown', onDocumentKeyDown, false)
 
@@ -583,7 +587,7 @@ function graphGenome() {
     .attr('opacity', 1)
     .attr('class', 'link interchromosomal')
 
-  gg.context = makeAbsoluteContext(graph.layer2[0][0], graph.svg[0][0])
+  graph.context = makeAbsoluteContext(graph.layer2[0][0], graph.svg[0][0])
 
   gg.force
     .nodes(gg.nodes)
@@ -769,6 +773,20 @@ function onDocumentMouseMove(event) {
   mouse.x = ((event.clientX - (width / 2)) / renderer.domElement.clientWidth) * 2 - 1
   mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1
 
+  if (!shifting && dragging) {
+    var a = graph.context(click.x, click.y)
+    var b = graph.context(event.clientX, event.clientY)
+    var x1 = a.x < b.x ? a.x : b.x
+    var x2 = a.x > b.x ? a.x : b.x
+    var y1 = a.y < b.y ? a.y : b.y
+    var y2 = a.y > b.y ? a.y : b.y
+    graph.marquee
+      .attr('x', x1)
+      .attr('y', y1)
+      .attr('width', x2 - x1)
+      .attr('height', y2 - y1)
+  }
+
   raycaster.setFromCamera(mouse, camera)
   var intersections = raycaster.intersectObjects(genome.children)
   var intersection = ( intersections.length ) > 0 ? intersections[ 0 ] : null
@@ -792,8 +810,71 @@ function onDocumentMouseMove(event) {
   }
 }
 
+function onDocumentMouseDown(event) {
+  graph.marquee = graph.svg.append('rect')
+    .attr('rx', 2)
+    .attr('stroke', '#fff')
+    .attr('class', 'selection')
+    .attr('x', event.clientX)
+    .attr('y', event.clientY)
+    .attr('fill', 'none')
+    .attr('pointer-events', 'none')
+  click.x = event.clientX
+  click.y = event.clientY
+  dragging = true
+}
+
+function onDocumentMouseUp(event) {
+  if (!shifting && dragging && click.x != event.clientX && click.y != event.clientY) {
+    var a = graph.context(click.x, click.y)
+    var b = graph.context(event.clientX, event.clientY)
+    var x1 = a.x < b.x ? a.x : b.x
+    var x2 = a.x > b.x ? a.x : b.x
+    var y1 = a.y < b.y ? a.y : b.y
+    var y2 = a.y > b.y ? a.y : b.y
+    var nodes = navigation[navigated].context == 'genome' ? graph.genome.nodes : graph.chromosomes.nodes
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i]
+      if (node.px > x1 && node.px < x2 && node.py > y1 && node.py < y2) {
+        node.pinned = true
+        pinned++
+      }
+    }
+    if (navigation[navigated].context == 'genome') {
+      for (var i = 0; i < chromosomes.length; i++) {
+        var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
+        if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.8
+        else for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.2
+        bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+      }
+    } else if (navigation[navigated].context == 'chromosomes') {
+      alphaModelFromGraph()
+    }
+    d3.selectAll('.node').attr('opacity', function(d){ return d.pinned ? 1 : 0.2 })
+    graph.marquee.remove()
+  }
+  dragging = false
+}
+
 function onDocumentKeyDown(event) {
   if (event.shiftKey) shifting = true
+}
+
+function alphaModelFromGraph() {
+  var chr = graph.chromosomes.chr
+  for (var i = 0; i < chr.length; i++) {
+    var segment = segments[chr[i]]
+    var geometry = bufferGeometry[chr[i]]
+    var mesh = meshes[chr[i]]
+    var total = geometry.attributes.alpha.count
+    var bins = segment[1] - segment[0]
+    var size = parseInt(total / bins)
+    for (var j = segment[0]; j < segment[1]; j++) {
+      if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
+      else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
+    }
+    geometry.attributes.alpha.needsUpdate = true
+  }
 }
 
 function onDocumentKeyUp(event) {
@@ -801,20 +882,7 @@ function onDocumentKeyUp(event) {
     if (navigation[navigated].context == 'chromosomes') {
       if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
       else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
-      var chr = graph.chromosomes.chr
-      for (var i = 0; i < chr.length; i++) {
-        var segment = segments[chr[i]]
-        var geometry = bufferGeometry[chr[i]]
-        var mesh = meshes[chr[i]]
-        var total = geometry.attributes.alpha.count
-        var bins = segment[1] - segment[0]
-        var size = parseInt(total / bins)
-        for (var j = segment[0]; j < segment[1]; j++) {
-          if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
-          else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
-        }
-        geometry.attributes.alpha.needsUpdate = true
-      }
+      alphaModelFromGraph()
     }
     shifting = false
   }
@@ -893,6 +961,7 @@ function distanceToSquared(x1, y1, z1, x2, y2, z2) {
 }
 
 function zoomed() {
+  if (!shifting) return
   graph.container.selectAll('.node').selectAll('circle,text').attr('transform', 'scale(' + (((zoomToBin + 2) - d3.event.scale) / (zoomToBin + 1)) + ')')
   graph.container.attr('transform', 'translate(' + d3.event.translate + ')scale(' + d3.event.scale + ')')
 }

@@ -798,21 +798,23 @@ function onDocumentKeyDown(event) {
 
 function onDocumentKeyUp(event) {
   if (shifting) {
-    if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
-    else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
-    var chr = graph.chromosomes.chr
-    for (var i = 0; i < chr.length; i++) {
-      var segment = segments[chr[i]]
-      var geometry = bufferGeometry[chr[i]]
-      var mesh = meshes[chr[i]]
-      var total = geometry.attributes.alpha.count
-      var bins = segment[1] - segment[0]
-      var size = parseInt(total / bins)
-      for (var j = segment[0]; j < segment[1]; j++) {
-        if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
-        else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
+    if (navigation[navigated].context == 'chromosomes') {
+      if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
+      else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+      var chr = graph.chromosomes.chr
+      for (var i = 0; i < chr.length; i++) {
+        var segment = segments[chr[i]]
+        var geometry = bufferGeometry[chr[i]]
+        var mesh = meshes[chr[i]]
+        var total = geometry.attributes.alpha.count
+        var bins = segment[1] - segment[0]
+        var size = parseInt(total / bins)
+        for (var j = segment[0]; j < segment[1]; j++) {
+          if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
+          else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
+        }
+        geometry.attributes.alpha.needsUpdate = true
       }
-      geometry.attributes.alpha.needsUpdate = true
     }
     shifting = false
   }

@@ -282,43 +282,42 @@ $('#contact_map').on('mousemove', function(e){
   var binB = indexToBin(y)
   cm.select('.crossX').attr('y1', my).attr('y2', my)
   cm.select('.crossY').attr('x1', mx).attr('x2', mx)
-  // if (cmClick != null) {
-  //   cm.select('.selection').attr('width', mx - cmClick[0]).attr('height', my - cmClick[1])
-  //   for (var x = cmClick[2]; x < binA; x++) {
-  //     for (var y = cmClick[3]; y < binB; y++) {
-  //       for (var x2 = cmClick[2]; x2 < binA; x2++) {
-  //         if (x2 == x) continue
-  //         for (var y2 = cmClick[3]; y2 < binB; y2++) {
-  //           if (y2 == y) continue
-  //           showContact(x, y, x2, y2)
-  //         }
-  //       }
-  //     }
-  //   }
-  // } else
-  showContact(binA[0], binA[1], binB[0], binB[1])
+  if (cmClick != null) {
+    // cm.select('.selection').attr('width', mx - cmClick[0]).attr('height', my - cmClick[1])
+    for (var x = cmClick[2]; x < binA; x++) {
+      for (var y = cmClick[3]; y < binB; y++) {
+        for (var x2 = cmClick[2]; x2 < binA; x2++) {
+          if (x2 == x) continue
+          for (var y2 = cmClick[3]; y2 < binB; y2++) {
+            if (y2 == y) continue
+            showContact(x, y, x2, y2)
+          }
+        }
+      }
+    }
+  } else showContact(binA[0], binA[1], binB[0], binB[1])
 })
 $('#contact_map').on('mouseout', function() {
   cmClick = null
   hideContacts()
 })
-// $('#contact_map').on('mousedown', function(e) {
-//   var mx = e.pageX - $(this).offset().left
-//   var my = e.pageY - $(this).offset().top
-//   var x = parseInt(mx / cmSize * segments[segments.length - 1][1])
-//   var y = parseInt(my / cmSize * segments[segments.length - 1][1])
-//   var binA = indexToBin(x)
-//   var binB = indexToBin(y)
-//   cmClick = [mx, my, binA[1], binB[1]]
-//   colorBin(binA[0], binA[1], d3.rgb(255, 0, 0))
-//   colorGraph(binA[0], binA[1])
-//   cm.append('rect')
-//     .attr('fill', '#fff')
-//     .attr('opacity', 0.5)
-//     .attr('x', mx)
-//     .attr('y', my)
-//     .attr('class', 'selection')
-// })
+$('#contact_map').on('mousedown', function(e) {
+  var mx = e.pageX - $(this).offset().left
+  var my = e.pageY - $(this).offset().top
+  var x = parseInt(mx / cmSize * segments[segments.length - 1][1])
+  var y = parseInt(my / cmSize * segments[segments.length - 1][1])
+  var binA = indexToBin(x)
+  var binB = indexToBin(y)
+  cmClick = [mx, my, binA[1], binB[1]]
+  colorBin(binA[0], binA[1], d3.rgb(255, 0, 0))
+  colorGraph(binA[0], binA[1])
+  cm.append('rect')
+    .attr('fill', '#fff')
+    .attr('opacity', 0.5)
+    .attr('x', mx)
+    .attr('y', my)
+    .attr('class', 'selection')
+})
 $('#coloration input').click(function(){
   coloration = $(this).val()
   colorGenes()

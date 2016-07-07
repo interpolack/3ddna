@@ -16,6 +16,7 @@ html, body {
   text-transform: uppercase;
   font-size: 10px;
   background-color: #000;
+  overflow: hidden;
 }
 #controls {
   position: absolute;
@@ -93,6 +94,13 @@ html, body {
 .link {
   cursor: pointer;
 }
+#linear {
+  position: absolute;
+  width: 100%;
+  height: 30px;
+  left: 0;
+  bottom: 0;
+}
 </style>
 <body>
   <div id='controls'>
@@ -107,9 +115,11 @@ html, body {
     <span>&xopf; </span>&nbsp;<input id='search' type='text'></input>
     <br>
   </div>
-  <div id='matrix'>
-  </div>
+  <!-- <div id='matrix'>
+  </div> -->
   <div id='left'>
+    <div id='linear'>
+    </div>
     <div id='graph'>
     </div>
   </div>
@@ -154,6 +164,7 @@ var rainbow = d3.scale.category20(),
     mapCap,
 
     graph = {},
+    linear = {},
     width = window.innerWidth,
     initialWidth = window.innerWidth,
     height = window.innerHeight,
@@ -179,6 +190,7 @@ var rainbow = d3.scale.category20(),
     genome,
     raycaster = new THREE.Raycaster(),
     mouse = new THREE.Vector2(),
+    shifting = false,
 
     zoomToBin = 8,
     graphed = false,
@@ -305,14 +317,18 @@ function init() {
   graph.container = graph.svg.append('g')
   graph.layer1 = graph.container.append('g')
   graph.layer2 = graph.container.append('g')
-  graph.layer3 = graph.svg.append('g')
-  graph.layer4 = graph.svg.append('g')
+  graph.layer3 = graph.container.append('g')
+  graph.layer4 = graph.container.append('g')
 
-  matrix.svg = d3.select('#matrix').append('svg')
-    .attr('width', 200)
-    .attr('height', 200)
-  matrix.layer1 = matrix.svg.append('g')
-  matrix.layer2 = matrix.svg.append('g')
+  // matrix.svg = d3.select('#matrix').append('svg')
+  //   .attr('width', 200)
+  //   .attr('height', 200)
+  // matrix.layer1 = matrix.svg.append('g')
+  // matrix.layer2 = matrix.svg.append('g')
+
+  linear.svg = d3.select('#linear').append('svg')
+    .attr('width', width / 2)
+    .attr('height', 20)
 
   scene = new THREE.Scene()
   camera = new THREE.PerspectiveCamera(75, width / height / 2, 1, 20000)
@@ -325,6 +341,7 @@ function init() {
   window.addEventListener('resize', onWindowResize, false)
   document.addEventListener('mousemove', onDocumentMouseMove, false)
   document.addEventListener('keyup', onDocumentKeyUp, false)
+  document.addEventListener('keydown', onDocumentKeyDown, false)
 
   navigation.push({
     'context': 'genome',
@@ -531,6 +548,14 @@ function graphGenome() {
       else for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.2
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
+    var width = (segments[d.chromosome][1] - segments[d.chromosome][0]) * linear.ratio
+    if (!d.pinned) linear.svg.append('rect')
+      .attr('fill', rainbow(d.chromosome))
+      .attr('rx', 5)
+      .attr('x', 20 + (segments[d.chromosome][0]) * linear.ratio)
+      .attr('width', width < 10 ? 10 : width)
+      .attr('height', 10)
+      .attr('class', 'highlight chr' + d.chromosome + '-all')
   })
   nodeEnter.on('mouseout', function(d){
     if (pinned == 0) d3.selectAll('.chromosome').attr('opacity', 1)
@@ -541,12 +566,14 @@ function graphGenome() {
       else for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.2
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
+    linear.svg.selectAll('.chr' + d.chromosome + '-all').filter(function(o){ return !d3.select(this).classed('pinned') }).remove()
   })
   nodeEnter.on('click', function(d){
     d.pinned = !d.pinned
     if (d.pinned) pinned++
     else pinned--
     chromosomes[d.chromosome] = d
+    linear.svg.selectAll('.chr' + d.chromosome + '-all').classed('pinned', d.pinned)
   })
 
   var link = graph.layer1.selectAll('.link')
@@ -571,6 +598,16 @@ function graphGenome() {
     .attr('y1', function(d){ return d.source.y })
     .attr('x2', function(d){ return d.target.x })
     .attr('y2', function(d){ return d.target.y })
+
+  linear.svg.line = linear.svg.append('rect')
+    .attr('rx', 5)
+    .attr('width', (width / 2) - 50)
+    .attr('height', 10)
+    .attr('x', 20)
+    .attr('fill', '#222')
+
+  linear.ratio = 1 / segments[segments.length - 1][1] * ((width / 2) - 50)
+  linear.lit = {}
 }
 
 function graphChromosomes(chr) {
@@ -578,16 +615,20 @@ function graphChromosomes(chr) {
   pinned = 0
   for (var i = 0; i < chromosomes.length; i++) chromosomes[i].pinned = false
 
+  linear.svg.selectAll('.highlight').attr('fill', '#444')
+
   graphed = true
   var cg = graph.chromosomes = {}
   cg.force = d3.layout.force()
     .size([width / 2, height])
     .linkDistance(function(d){ return d.distance * 3 })
-    .charge(-10)
+    // .linkStrength(10)
+    // .charge(-100)
   cg.nodes = []
   cg.nodesDict = {}
   cg.links = []
   cg.linked = {}
+  cg.chr = chr
 
   for (var i = 0; i < chr.length; i++) {
     var segment = segments[chr[i]]
@@ -601,9 +642,15 @@ function graphChromosomes(chr) {
     cg.nodes[i].pinned = false
     var bin = cg.nodes[i]
     for (var j = 0; j < cg.nodes.length; j++) {
+      if (i == j) continue
       var con = cg.nodes[j].bin
       if (bin.contacts[con] < 5 && cg.linked[con] == null) {
-        cg.links.push({'source': i, 'target': j, 'distance': bin.contacts[con]})
+        cg.links.push({
+          'source': i,
+          'target': j,
+          'distance': bin.contacts[con],
+          'physical': Math.abs(j - i) == 1 && cg.nodes[i].chromosome == cg.nodes[j].chromosome ? cg.nodes[i].chromosome : false
+        })
         cg.linked[bin.bin] = true
       }
     }
@@ -636,6 +683,13 @@ function graphChromosomes(chr) {
       }
       geometry.attributes.alpha.needsUpdate = true
     }
+    if (!d.pinned) linear.svg.append('line')
+      .attr('stroke', rainbow(d.chromosome))
+      .attr('x1', 20 + d.bin * linear.ratio)
+      .attr('x2', 20 + d.bin * linear.ratio)
+      .attr('y1', 0)
+      .attr('y2', 10)
+      .attr('class', 'highlight chr' + d.chromosome + '-' + d.bin)
   })
   nodeEnter.on('mouseout', function(d){
     if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
@@ -653,19 +707,21 @@ function graphChromosomes(chr) {
       }
       geometry.attributes.alpha.needsUpdate = true
     }
+    linear.svg.selectAll('.chr' + d.chromosome + '-' + d.bin).filter(function(o){ return !d3.select(this).classed('pinned') }).remove()
   })
   nodeEnter.on('click', function(d){
     d.pinned = !d.pinned
     if (d.pinned) pinned++
     else pinned--
     all[d.bin] = d
+    linear.svg.selectAll('.chr' + d.chromosome + '-' + d.bin).classed('pinned', d.pinned)
   })
 
   var link = graph.layer1.selectAll('.link')
     .data(cg.links).enter().append('line')
     .attr('stroke-width', 1)
-    .attr('stroke', '#fff')
-    .attr('opacity', 0.2)
+    .attr('stroke', function(d){ return d.physical ? rainbow(d.physical) : '#fff' })
+    .attr('opacity', function(d){ return d.physical ? 1 : 0.2 })
     .attr('class', 'link interbin')
 
   cg.force
@@ -701,7 +757,8 @@ function onWindowResize() {
   height = window.innerHeight
   graph.container.attr('transform', 'translate(' + ((width - initialWidth) / 4) + ',0)scale(' + (height / initialHeight) + ')')
   graph.svg.attr('width', width / 2).attr('height', height)
-  // graph.genome.force.size([width / 2, height])
+  linear.svg.attr('width', width / 2)
+  linear.svg.line.attr('width', (width / 2) - 50)
   camera.aspect = width / height / 2
   camera.updateProjectionMatrix()
   renderer.setSize(width / 2, height)
@@ -716,7 +773,7 @@ function onDocumentMouseMove(event) {
   var intersections = raycaster.intersectObjects(genome.children)
   var intersection = ( intersections.length ) > 0 ? intersections[ 0 ] : null
 
-  if (intersection !== null && intersection.object.visible && intersection.object.name !== "") {
+  if (shifting && intersection !== null && intersection.object.visible && intersection.object.name !== "") {
     if (pinned == 0 && navigation[navigated].context == 'chromosomes') {
       var chromosome = intersection.object.name
       var faceIndex = intersection.faceIndex
@@ -735,7 +792,30 @@ function onDocumentMouseMove(event) {
   }
 }
 
+function onDocumentKeyDown(event) {
+  if (event.shiftKey) shifting = true
+}
+
 function onDocumentKeyUp(event) {
+  if (shifting) {
+    if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
+    else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+    var chr = graph.chromosomes.chr
+    for (var i = 0; i < chr.length; i++) {
+      var segment = segments[chr[i]]
+      var geometry = bufferGeometry[chr[i]]
+      var mesh = meshes[chr[i]]
+      var total = geometry.attributes.alpha.count
+      var bins = segment[1] - segment[0]
+      var size = parseInt(total / bins)
+      for (var j = segment[0]; j < segment[1]; j++) {
+        if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
+        else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
+      }
+      geometry.attributes.alpha.needsUpdate = true
+    }
+    shifting = false
+  }
   event.preventDefault()
   if (navigated > 0 && (event.keyCode == 8 || event.keyCode == 46)) {
     navigated--

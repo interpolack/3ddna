@@ -24,9 +24,6 @@ html, body {
   left: 0;
   padding: 10px;
 }
-  span {
-    font-size: 20px;
-  }
   #controls select {
     width: 100px;
   }
@@ -98,7 +95,7 @@ html, body {
 #linear {
   position: absolute;
   width: 100%;
-  height: 30px;
+  height: 100px;
   left: 0;
   bottom: 0;
 }
@@ -122,37 +119,47 @@ html, body {
   color: #666;
   cursor: pointer;
 }
-  #wireframe span {
-    font-size: 20px;
-  }
-  #wireframe:hover {
-    color: #00c4f4;
-  }
+#lookup {
+  position: absolute;
+  left: 20px;
+  bottom: 35px;
+  visibility: hidden;
+}
+.icon {
+  font-size: 20px;
+}
+.button {
+  cursor: pointer;
+}
+.button:hover {
+  color: #00c4f4;
+}
 </style>
 <body>
   <!-- <div id='matrix'>
   </div> -->
   <div id='left'>
     <div id='controls'>
-      <span>&ocir; </span> <select id='node'>
+      <span class='icon'>&ocir; </span> <select id='node'>
         <option value='chromosome'>chromosome</option>
         <option value='1Mb'>1Mb</option>
       </select><br>
-      <span>&origof; </span> <select id='link'>
+      <span class='icon'>&origof; </span> <select id='link'>
         <option value='weighted'>distance/bin</option>
         <option value='distance'>distance</option>
       </select><br>
-      <span>&xopf; </span>&nbsp;<input id='search' type='text'></input>
+      <span class='icon'>&xopf; </span>&nbsp;<input id='search' type='text'></input>
       <br>
     </div>
     <div id='unpin'>&Cross; &cirmid;</div>
+    <!-- <div id='lookup' class='button'><span class='icon'>&supsub;</span> ucsc gb</div> -->
     <div id='linear'></div>
     <div id='graph'></div>
   </div>
   <div id='model'>
-    <div id='wireframe'>toggle lamina <span>&smashp;</span></div>
+    <div id='wireframe'>toggle lamina <span class='icon'>&smashp;</span></div>
     <div id='navigation'>
-      <div class='nav'><span>&oast;</span> genome</div>
+      <div class='nav'><span class='icon'>&oast;</span> genome</div>
     </div>
   </div>
 </body>
@@ -354,7 +361,7 @@ function init() {
 
   linear.svg = d3.select('#linear').append('svg')
     .attr('width', width / 2)
-    .attr('height', 20)
+    .attr('height', 100)
 
   scene = new THREE.Scene()
   camera = new THREE.PerspectiveCamera(75, width / height / 2, 1, 20000)
@@ -391,9 +398,10 @@ function init() {
     for (var i = 0; i < nodes.length; i++) nodes[i].pinned = false
     pinned = 0
     d3.selectAll('.node').attr('opacity', 1)
-    linear.svg.selectAll('.active.highlight').remove()
+    linear.svg.selectAll('.active').filter('.highlight').remove()
     alphaModel(0.8, navigation[navigated].chromosomes)
     $(this).css('visibility', 'hidden')
+    $('#lookup').css('visibility', 'hidden')
   })
 
   $('#wireframe').on('click', function() {
@@ -417,6 +425,7 @@ function navigate(nav) {
   if (navigation[nav].context == 'genome') {
     graphGenome()
     alphaModel(0.8)
+    linear.svg.selectAll('.chromosome').remove()
     $('#unpin').css('visibility', 'hidden')
   } else if (navigation[nav].context == 'chromosomes') {
     if (navigation[navigated].chromosomes != navigation[nav].chromosomes) graphChromosomes(navigation[nav].chromosomes)
@@ -585,7 +594,7 @@ function graphGenome() {
     .attr('stroke-width', 3)
     .attr('fill', function(d,i){ return rainbow(i) })
   nodeEnter.append('text')
-    .text(function(d,i){ return (i % 20) == 19 ? "X" : (i % 20) + 1 })
+    .text(function(d,i){ return chromosomeName(i) })
     .attr('fill', '#333')
     .attr('font-size', '8px')
     .attr('y', 3)
@@ -605,6 +614,7 @@ function graphGenome() {
       .attr('fill', rainbow(d.chromosome))
       .attr('rx', 5)
       .attr('x', 20 + (segments[d.chromosome][0]) * linear.ratio)
+      .attr('y', 70)
       .attr('width', atLeast((segments[d.chromosome][1] - segments[d.chromosome][0]) * linear.ratio, 10))
       .attr('height', 10)
       .attr('class', 'active highlight chr' + d.chromosome + '-all')
@@ -657,6 +667,7 @@ function graphGenome() {
     .attr('width', (width / 2) - 50)
     .attr('height', 10)
     .attr('x', 20)
+    .attr('y', 70)
     .attr('fill', '#222')
 
   linear.ratio = 1 / segments[segments.length - 1][1] * ((width / 2) - 50)
@@ -740,8 +751,8 @@ function graphChromosomes(chr) {
       .attr('stroke', rainbow(d.chromosome))
       .attr('x1', 20 + d.bin * linear.ratio)
       .attr('x2', 20 + d.bin * linear.ratio)
-      .attr('y1', 0)
-      .attr('y2', 10)
+      .attr('y1', 70 + 0)
+      .attr('y2', 70 + 10)
       .attr('class', 'active highlight chr' + d.chromosome + '-' + d.bin)
   })
   nodeEnter.on('mouseout', function(d){
@@ -792,6 +803,81 @@ function graphChromosomes(chr) {
     .attr('x2', function(d){ return d.target.x })
     .attr('y2', function(d){ return d.target.y })
 
+  linear.svg.chromosomes = {}
+  var longest = segments[0][1] - segments[0][0]
+  for (var i = 0; i < chr.length; i++) {
+    var c = chr[i]
+    var chromosome = linear.svg.append('g')
+      .attr('transform', 'translate(0,' + (70 - ((i + 1) * 15)) + ')')
+      .attr('class', 'chromosome')
+      .on('mouseleave', function(){
+        linear.svg.chromosomes[c].selectAll('.box').remove()
+      })
+      .on('mouseenter', function(){
+        var highlighted = []
+        var nodes = graph.chromosomes.nodes
+        var i = 0
+        var start = null
+        while (i < nodes.length - 1) {
+          if (start == null && nodes[i].pinned && nodes[i + 1].pinned) start = i
+          else if (start != null && nodes[i].pinned && !nodes[i + 1].pinned) {
+            highlighted.push([start, i])
+            start = null
+          }
+          i++
+        }
+        if (start != null) highlighted.push([start, i])
+        var ratio = 1 / (segments[0][1] - segments[0][0]) * ((width / 2) - 70)
+        linear.svg.chromosomes[c].selectAll('.box')
+          .data(highlighted).enter().append('rect')
+          .attr('class', 'box')
+          .attr('cursor', 'pointer')
+          .attr('stroke', '#fff')
+          .attr('fill', 'transparent')
+          .attr('rx', 2)
+          .attr('x', function(d){
+            var nodeA = nodes[d[0]]
+            var start = 15 + 20 + (nodeA.bin - segments[nodeA.chromosome][0]) * ratio
+            return start
+          })
+          .attr('height', 10)
+          .attr('width', function(d){
+            var nodeA = nodes[d[0]]
+            var nodeB = nodes[d[1]]
+            var start = 15 + 20 + (nodeA.bin - segments[nodeA.chromosome][0]) * ratio
+            var end = 15 + 20 + (nodeB.bin - segments[nodeB.chromosome][0]) * ratio
+            return end - start
+          })
+          .on('click', function(d){
+            lookup(c, d)
+          })
+      })
+    chromosome.append('rect')
+      .attr('rx', 5)
+      .attr('width', 10)
+      .attr('height', 10)
+      .attr('x', 20)
+      .attr('y', 0)
+      .attr('fill', rainbow(c))
+      .attr('cursor', 'pointer')
+      // .on('click', function(){ lookup(c) })
+    chromosome.append('text')
+      .text(chromosomeName(c))
+      .attr('fill', '#333')
+      .attr('font-size', 6)
+      .attr('x', 25)
+      .attr('y', 7.5)
+      .attr('text-anchor', 'middle')
+      .attr('pointer-events', 'none')
+      .attr('font-weight', 500)
+    chromosome.append('rect')
+      .attr('rx', 5)
+      .attr('width', (segments[c][1] - segments[c][0]) / longest * ((width / 2) - 70))
+      .attr('height', 10)
+      .attr('x', 35)
+      .attr('fill', '#222')
+    linear.svg.chromosomes[c] = chromosome
+  }
 }
 
 function animate() {
@@ -887,16 +973,27 @@ function onDocumentMouseUp(event) {
           .attr('fill', rainbow(node.chromosome))
           .attr('rx', 5)
           .attr('x', 20 + (segments[node.chromosome][0]) * linear.ratio)
+          .attr('y', 70)
           .attr('width', atLeast((segments[node.chromosome][1] - segments[node.chromosome][0]) * linear.ratio, 10))
           .attr('height', 10)
           .attr('class', 'active highlight chr' + node.chromosome + '-all')
-        else if (navigation[navigated].context == 'chromosomes' && !node.pinned) linear.svg.append('line')
-          .attr('stroke', rainbow(node.chromosome))
-          .attr('x1', 20 + node.bin * linear.ratio)
-          .attr('x2', 20 + node.bin * linear.ratio)
-          .attr('y1', 0)
-          .attr('y2', 10)
-          .attr('class', 'active highlight chr' + node.chromosome + '-' + node.bin)
+        else if (navigation[navigated].context == 'chromosomes' && !node.pinned) {
+          linear.svg.append('line')
+            .attr('stroke', rainbow(node.chromosome))
+            .attr('x1', 20 + node.bin * linear.ratio)
+            .attr('x2', 20 + node.bin * linear.ratio)
+            .attr('y1', 70 + 0)
+            .attr('y2', 70 + 10)
+            .attr('class', 'active highlight chr' + node.chromosome + '-' + node.bin)
+          var ratio = 1 / (segments[0][1] - segments[0][0]) * ((width / 2) - 70)
+          linear.svg.chromosomes[node.chromosome].append('line')
+            .attr('stroke', rainbow(node.chromosome))
+            .attr('x1', 15 + 20 + (node.bin - segments[node.chromosome][0]) * ratio)
+            .attr('x2', 15 + 20 + (node.bin - segments[node.chromosome][0]) * ratio)
+            .attr('y1', 0)
+            .attr('y2', 10)
+            .attr('class', 'active highlight chr' + node.chromosome + '-' + node.bin)
+        }
         node.pinned = true
         pinned++
       }
@@ -954,7 +1051,7 @@ function onDocumentKeyUp(event) {
         }
       }
       locus.divideScalar(pin.length)
-      $('#navigation').append("<div class='nav'><span>&acd;</span> chromosome " + pin.toString() + "</div>")
+      $('#navigation').append("<div class='nav'><span class='icon'>&acd;</span> chromosome " + pin.map(function(c){ return chromosomeName(c) }).toString() + "</div>")
       navigation.push({
         'context': 'chromosomes',
         'node': '1Mb',
@@ -988,7 +1085,7 @@ function onDocumentKeyUp(event) {
       }
       locus.divideScalar(pin.length)
       var string = pin.length == 1 ? pin[0] : pin[0] + "..." + pin[pin.length - 1]
-      $('#navigation').append("<div class='nav'><span>&there4;</span> bin " + string + "</div>")
+      $('#navigation').append("<div class='nav'><span class='icon'>&there4;</span> bin " + string + "</div>")
       navigation.push({
         'context': 'bins',
         'node': '1Mb',
@@ -1033,12 +1130,24 @@ function alphaModel(alpha, visible) {
   }
 }
 
+function lookup(chromosome, bins) {
+  var prefix = 'https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg38&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position='
+  var suffix = '&hgsid=501888851_Vr81OkrPRrUhSo3kt4U7ITltFimU'
+  var target = 'chr' + chromosomeName(chromosome) + '%3A' + (bins[0] * 1000000) + '-' + (bins[1] * 1000000)
+  window.open(prefix + target + suffix, '_blank')
+  window.focus()
+}
+
 function distanceToSquared(x1, y1, z1, x2, y2, z2) {
   return Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2)
 }
 
 function atLeast(value, least) {
   return value > least ? value : least
+}
+
+function chromosomeName(index) {
+  return (index % 20) == 19 ? "X" : (index % 20) + 1
 }
 
 function zoomed() {

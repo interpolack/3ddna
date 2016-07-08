@@ -419,7 +419,8 @@ function navigate(nav) {
     alphaModel(0.8)
     $('#unpin').css('visibility', 'hidden')
   } else if (navigation[nav].context == 'chromosomes') {
-    graphChromosomes(navigation[nav].chromosomes)
+    if (navigation[navigated].chromosomes != navigation[nav].chromosomes) graphChromosomes(navigation[nav].chromosomes)
+    d3.selectAll('.node').attr('opacity', 1)
     alphaModel(0.8, navigation[nav].chromosomes)
     $('#unpin').css('visibility', 'hidden')
   } else if (navigation[nav].context == 'bins') {
@@ -970,7 +971,7 @@ function onDocumentKeyUp(event) {
         var segment = segments[bin.chromosome]
         var bins = segment[1] - segment[0]
         var size = parseInt(total / bins)
-        var target = (bin.bin - segment[0]) * size
+        var target = (bin.bin - segment[0]) * size * 3
         var center = new THREE.Vector3(
           geometry.attributes.position.array[target],
           geometry.attributes.position.array[target + 1],

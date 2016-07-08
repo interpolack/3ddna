@@ -391,7 +391,7 @@ function init() {
     for (var i = 0; i < nodes.length; i++) nodes[i].pinned = false
     pinned = 0
     d3.selectAll('.node').attr('opacity', 1)
-    linear.svg.selectAll('.highlight').remove()
+    linear.svg.selectAll('.active.highlight').remove()
     alphaModel(0.8, navigation[navigated].chromosomes)
     $(this).css('visibility', 'hidden')
   })
@@ -607,7 +607,7 @@ function graphGenome() {
       .attr('x', 20 + (segments[d.chromosome][0]) * linear.ratio)
       .attr('width', atLeast((segments[d.chromosome][1] - segments[d.chromosome][0]) * linear.ratio, 10))
       .attr('height', 10)
-      .attr('class', 'highlight chr' + d.chromosome + '-all')
+      .attr('class', 'active highlight chr' + d.chromosome + '-all')
   })
   nodeEnter.on('mouseout', function(d){
     if (pinned == 0) d3.selectAll('.chromosome').attr('opacity', 1)
@@ -668,7 +668,7 @@ function graphChromosomes(chr) {
   pinned = 0
   for (var i = 0; i < chromosomes.length; i++) chromosomes[i].pinned = false
 
-  linear.svg.selectAll('.highlight').attr('fill', '#444')
+  linear.svg.selectAll('.highlight').attr('fill', '#444').classed('active', false)
 
   graphed = true
   var cg = graph.chromosomes = {}
@@ -742,7 +742,7 @@ function graphChromosomes(chr) {
       .attr('x2', 20 + d.bin * linear.ratio)
       .attr('y1', 0)
       .attr('y2', 10)
-      .attr('class', 'highlight chr' + d.chromosome + '-' + d.bin)
+      .attr('class', 'active highlight chr' + d.chromosome + '-' + d.bin)
   })
   nodeEnter.on('mouseout', function(d){
     if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
@@ -883,13 +883,20 @@ function onDocumentMouseUp(event) {
       var node = nodes[i]
       var nc = graph.context(node.px, node.py)
       if (nc.x > x1 && nc.x < x2 && nc.y > y1 && nc.y < y2) {
-        if (!node.pinned) linear.svg.append('rect')
+        if (navigation[navigated].context == 'genome' && !node.pinned) linear.svg.append('rect')
           .attr('fill', rainbow(node.chromosome))
           .attr('rx', 5)
           .attr('x', 20 + (segments[node.chromosome][0]) * linear.ratio)
           .attr('width', atLeast((segments[node.chromosome][1] - segments[node.chromosome][0]) * linear.ratio, 10))
           .attr('height', 10)
-          .attr('class', 'highlight chr' + node.chromosome + '-all')
+          .attr('class', 'active highlight chr' + node.chromosome + '-all')
+        else if (navigation[navigated].context == 'chromosomes' && !node.pinned) linear.svg.append('line')
+          .attr('stroke', rainbow(node.chromosome))
+          .attr('x1', 20 + node.bin * linear.ratio)
+          .attr('x2', 20 + node.bin * linear.ratio)
+          .attr('y1', 0)
+          .attr('y2', 10)
+          .attr('class', 'active highlight chr' + node.chromosome + '-' + node.bin)
         node.pinned = true
         pinned++
       }

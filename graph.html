@@ -391,11 +391,8 @@ function init() {
     for (var i = 0; i < nodes.length; i++) nodes[i].pinned = false
     pinned = 0
     d3.selectAll('.node').attr('opacity', 1)
-    for (var i = 0; i < chromosomes.length; i++) {
-      var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
-      for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 1
-      bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
-    }
+    linear.svg.selectAll('.highlight').remove()
+    alphaModel(0.8, navigation[navigated].chromosomes)
     $(this).css('visibility', 'hidden')
   })
 
@@ -419,28 +416,22 @@ function navigate(nav) {
 
   if (navigation[nav].context == 'genome') {
     graphGenome()
-    for (var i = 0; i < chromosomes.length; i++) {
-      meshes[i].visible = true
-      var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
-      for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.8
-      bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
-    }
+    alphaModel(0.8)
     $('#unpin').css('visibility', 'hidden')
   } else if (navigation[nav].context == 'chromosomes') {
     graphChromosomes(navigation[nav].chromosomes)
-    for (var i = 0; i < chromosomes.length; i++) {
-      if (navigation[nav].chromosomes.indexOf(i) == -1) meshes[i].visible = false
-      else {
-        meshes[i].visible = true
-        var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
-        for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.8
-        bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
-      }
-    }
+    alphaModel(0.8, navigation[nav].chromosomes)
     $('#unpin').css('visibility', 'hidden')
   } else if (navigation[nav].context == 'bins') {
-    // TODO
-    // ? $('#unpin').css('visibility', 'hidden')
+    if (navigation[navigated].chromosomes != navigation[nav].chromosomes) graphChromosomes(navigation[nav].chromosomes)
+    for (var i = 0; i < navigation[nav].nodes.length; i++) {
+      graph.chromosomes.nodes[navigation[nav].nodes[i]].pinned = true
+      pinned++
+    }
+    d3.selectAll('.node').attr('opacity', function(d){ return d.pinned ? 1 : 0.3 })
+    alphaModel(0.8, navigation[nav].chromosomes)
+    alphaModelFromGraph()
+    $('#unpin').css('visibility', 'visible')
   }
 
   $('#node').val(navigation[nav].node)
@@ -468,10 +459,10 @@ function search(query) {
     for (var i = 0; i < chromosomes.length; i++) {
       if (chromosomes[i].found > max) max = chromosomes[i].found
     }
-    graph.svg.selectAll('.node').attr('opacity', function(d){ return d.found / max > 0.2 ? d.found / max : 0.2 })
+    graph.svg.selectAll('.node').attr('opacity', function(d){ return atLeast(d.found / max, 0.2) })
     for (var i = 0; i < chromosomes.length; i++) {
       var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
-      for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = chromosomes[i].found / max > 0.2 ? chromosomes[i].found / max : 0.2
+      for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = atLeast(chromosomes[i].found / max, 0.2)
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
   } else if (navigation[navigated].context == 'chromosomes') {
@@ -481,7 +472,7 @@ function search(query) {
       nodes[i].found = all[nodes[i].bin][query]
       if (nodes[i].found > max) max = nodes[i].found
     }
-    graph.svg.selectAll('.node').attr('opacity', function(d){ return d.found / max > 0.2 ? d.found / max : 0.2 })
+    graph.svg.selectAll('.node').attr('opacity', function(d){ return atLeast(d.found / max, 0.3) })
     alphaModelFromGraph(max)
   }
 }
@@ -609,12 +600,11 @@ function graphGenome() {
       else for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.2
       bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     }
-    var width = (segments[d.chromosome][1] - segments[d.chromosome][0]) * linear.ratio
     if (!d.pinned) linear.svg.append('rect')
       .attr('fill', rainbow(d.chromosome))
       .attr('rx', 5)
       .attr('x', 20 + (segments[d.chromosome][0]) * linear.ratio)
-      .attr('width', width < 10 ? 10 : width)
+      .attr('width', atLeast((segments[d.chromosome][1] - segments[d.chromosome][0]) * linear.ratio, 10))
       .attr('height', 10)
       .attr('class', 'highlight chr' + d.chromosome + '-all')
   })
@@ -848,7 +838,7 @@ function onDocumentMouseMove(event) {
 
   raycaster.setFromCamera(mouse, camera)
   var intersections = raycaster.intersectObjects(genome.children)
-  var intersection = ( intersections.length ) > 0 ? intersections[ 0 ] : null
+  var intersection = intersections.length > 0 ? intersections[0] : null
 
   if (shifting && intersection !== null && intersection.object.visible && intersection.object.name !== "") {
     if (pinned == 0 && navigation[navigated].context == 'chromosomes') {
@@ -857,11 +847,7 @@ function onDocumentMouseMove(event) {
       var total = bufferGeometry[chromosome].attributes.alpha.count
       var bins = segments[chromosome][1] - segments[chromosome][0]
       var bin = parseInt(faceIndex / total * bins)
-      for (var i = 0; i < segments.length; i++) {
-        var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
-        for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.2
-        bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
-      }
+      alphaModel(0.2)
       alphaBin(chromosome, bin, 1)
       var node = graph.chromosomes.nodesDict[chromosome + ':' + bin]
       graph.svg.selectAll('.node').attr('opacity', function(d,i){ return i == node ? 1 : 0.2 })
@@ -896,6 +882,13 @@ function onDocumentMouseUp(event) {
       var node = nodes[i]
       var nc = graph.context(node.px, node.py)
       if (nc.x > x1 && nc.x < x2 && nc.y > y1 && nc.y < y2) {
+        if (!node.pinned) linear.svg.append('rect')
+          .attr('fill', rainbow(node.chromosome))
+          .attr('rx', 5)
+          .attr('x', 20 + (segments[node.chromosome][0]) * linear.ratio)
+          .attr('width', atLeast((segments[node.chromosome][1] - segments[node.chromosome][0]) * linear.ratio, 10))
+          .attr('height', 10)
+          .attr('class', 'highlight chr' + node.chromosome + '-all')
         node.pinned = true
         pinned++
       }
@@ -913,31 +906,12 @@ function onDocumentMouseUp(event) {
     if (pinned != 0) d3.selectAll('.node').attr('opacity', function(d){ return d.pinned ? 1 : 0.2 })
     graph.marquee.remove()
     $('#unpin').css('visibility', pinned == 0 ? 'hidden' : 'visible')
-    // TODO linear highlights from marquee
   }
   dragging = false
 }
 
 function onDocumentKeyDown(event) {
   if (event.shiftKey) shifting = true
-}
-
-function alphaModelFromGraph(max) {
-  var chr = graph.chromosomes.chr
-  for (var i = 0; i < chr.length; i++) {
-    var segment = segments[chr[i]]
-    var geometry = bufferGeometry[chr[i]]
-    var mesh = meshes[chr[i]]
-    var total = geometry.attributes.alpha.count
-    var bins = segment[1] - segment[0]
-    var size = parseInt(total / bins)
-    for (var j = segment[0]; j < segment[1]; j++) {
-      if (max && all[j].found != null) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = all[j].found / max * 0.8 < 0.2 ? 0.2 : all[j].found / max * 0.8
-      else if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
-      else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
-    }
-    geometry.attributes.alpha.needsUpdate = true
-  }
 }
 
 function onDocumentKeyUp(event) {
@@ -961,8 +935,7 @@ function onDocumentKeyUp(event) {
   } else if (val.length > 0) {
     search(val)
   } else if (pinned > 0) {
-
-    if (navigation[navigated].node == 'chromosome') {
+    if (navigation[navigated].context == 'genome') {
       var pin = []
       var locus
       for (var i = 0; i < chromosomes.length; i++) {
@@ -981,37 +954,40 @@ function onDocumentKeyUp(event) {
         'chromosomes': pin,
         'locus': locus,
       })
-    } else if (navigation[navigated].node == '1Mb') {
+    } else if (navigation[navigated].context == 'chromosomes') {
       var pin = []
+      var nin = []
       var locus
-      for (var i = 0; i < all.length; i++) {
-        if (all[i].pinned) {
-          pin.push(i)
-          // var geometry = bufferGeometry[all[i].chromosome]
-          // var total = geometry.attributes.position.count
-          // var segment = segments[all[i].chromosome]
-          // console.log(geometry)
-          // console.log(meshes[all[i].chromosome])
-          // var bins = segment[1] - segment[0]
-          // var size = parseInt(total / bins)
-          // var target = (all[i].bin - segment[0]) * size
-          // var center = new THREE.Vector3(
-          //   geometry.attributes.position.array[target],
-          //   geometry.attributes.position.array[target + 1],
-          //   geometry.attributes.position.array[target + 2]
-          // )
-          // locus = locus == null ? center : locus.add(center)
-        }
+      var nodes = graph.chromosomes.nodes
+      for (var i = 0; i < nodes.length; i++) {
+        var node = nodes[i]
+        if (!node.pinned) continue
+        var bin = all[node.bin]
+        pin.push(bin.bin)
+        nin.push(i)
+        var geometry = bufferGeometry[bin.chromosome]
+        var total = geometry.attributes.position.count
+        var segment = segments[bin.chromosome]
+        var bins = segment[1] - segment[0]
+        var size = parseInt(total / bins)
+        var target = (bin.bin - segment[0]) * size
+        var center = new THREE.Vector3(
+          geometry.attributes.position.array[target],
+          geometry.attributes.position.array[target + 1],
+          geometry.attributes.position.array[target + 2]
+        )
+        locus = locus == null ? center : locus.add(center)
       }
-      // locus.divideScalar(pin.length)
-      locus = navigation[navigated].locus
-      $('#navigation').append("<div class='nav'><span>&there4;</span> bin " + pin.toString() + "</div>")
+      locus.divideScalar(pin.length)
+      var string = pin.length == 1 ? pin[0] : pin[0] + "..." + pin[pin.length - 1]
+      $('#navigation').append("<div class='nav'><span>&there4;</span> bin " + string + "</div>")
       navigation.push({
         'context': 'bins',
         'node': '1Mb',
         'link': 'distance',
         'chromosomes': navigation[navigated].chromosomes,
         'bins': pin,
+        'nodes': nin,
         'locus': locus,
       })
     }
@@ -1019,8 +995,42 @@ function onDocumentKeyUp(event) {
   }
 }
 
+function alphaModelFromGraph(max) {
+  var chr = graph.chromosomes.chr
+  for (var i = 0; i < chr.length; i++) {
+    var segment = segments[chr[i]]
+    var geometry = bufferGeometry[chr[i]]
+    var mesh = meshes[chr[i]]
+    var total = geometry.attributes.alpha.count
+    var bins = segment[1] - segment[0]
+    var size = parseInt(total / bins)
+    for (var j = segment[0]; j < segment[1]; j++) {
+      if (max && all[j].found != null) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = atLeast(all[j].found / max * 0.8, 0.3)
+      else if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
+      else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
+    }
+    geometry.attributes.alpha.needsUpdate = true
+  }
+}
+
+function alphaModel(alpha, visible) {
+  for (var i = 0; i < chromosomes.length; i++) {
+    if (visible != null && visible.indexOf(i) == -1) meshes[i].visible = false
+    else {
+      meshes[i].visible = true
+      var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
+      for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = alpha
+      bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+    }
+  }
+}
+
 function distanceToSquared(x1, y1, z1, x2, y2, z2) {
   return Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2)
+}
+
+function atLeast(value, least) {
+  return value > least ? value : least
 }
 
 function zoomed() {

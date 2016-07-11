@@ -1,0 +1,10 @@
+doctype
+html
+  head
+    title 3DNA
+    link(rel='stylesheet', href='/stylesheets/main.css')
+    body
+      &hercon;
+      form(action='/load3D', method='post', enctype='multipart/form-data')
+        input(type='file', name='coordinates')
+        input(type='submit', value='load')

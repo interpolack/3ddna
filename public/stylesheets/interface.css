@@ -1,0 +1,128 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Helvetica Neue';
+  color: #ffffff;
+  text-transform: uppercase;
+  font-size: 10px;
+  background-color: #000;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+}
+#controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 10px;
+}
+  #controls select {
+    width: 100px;
+  }
+  #search {
+    border-radius: 3px;
+    height: 18px;
+    width: 100px;
+    border: 1px solid #666;
+    color: #000;
+    padding-left: 8px;
+  }
+#navigation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 10px;
+}
+  #navigation .nav {
+    margin: 0;
+    cursor: pointer;
+    margin-bottom: -5px;
+  }
+  #navigation .nav.inactive {
+    color: #666;
+  }
+  #navigation .nav:hover {
+    color: #00c4f4;
+  }
+#left {
+  position: relative;
+  float: left;
+  display: inline-block;
+  width: 50%;
+  height: 100%;
+  background-color: #333;
+  margin: 0;
+  padding: 0;
+}
+#graph {
+  width: 100%;
+  height: 100%;
+  border-bottom: 1px solid #000;
+  overflow: hidden;
+}
+#matrix {
+  width: 200px;
+  height: 200px;
+  overflow: hidden;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+}
+#model {
+  position: relative;
+  float: left;
+  display: inline-block;
+  width: 50%;
+  height: 100%;
+  background-color: #000;
+  padding: 0;
+  overflow: hidden;
+}
+.node {
+  cursor: pointer;
+}
+.link {
+  cursor: pointer;
+}
+#linear {
+  position: absolute;
+  width: 100%;
+  height: 100px;
+  left: 0;
+  bottom: 0;
+}
+#unpin {
+  position: absolute;
+  width: 30px;
+  height: 20px;
+  right: 10px;
+  top: 10px;
+  font-size: 20px;
+  cursor: pointer;
+  visibility: hidden;
+}
+  #unpin:hover {
+    color: #00c4f4;
+  }
+#wireframe {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  color: #666;
+  cursor: pointer;
+}
+#lookup {
+  position: absolute;
+  left: 20px;
+  bottom: 35px;
+  visibility: hidden;
+}
+.icon {
+  font-size: 20px;
+}
+.button {
+  cursor: pointer;
+}
+.button:hover {
+  color: #00c4f4;
+}

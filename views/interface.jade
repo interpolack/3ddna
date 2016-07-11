@@ -1,0 +1,68 @@
+doctype
+html
+  head
+    title 3DNA
+    link(rel='stylesheet', href='/stylesheets/interface.css')
+    body
+      #left
+        #controls
+          span.icon &ocir;&nbsp;
+          select#node
+            option(value='chromosome') chromosome
+            option(value='1Mb') 1Mb
+          br
+          span.icon &origof;&nbsp;
+          select#link
+            option(value='weighted') distance/bin
+            option(value='distance') distance
+          br
+          span.icon &xopf;&nbsp;
+          input#search(type='text')
+          br
+        #unpin &Cross; &cirmid;&nbsp;
+        #linear
+        #graph
+      #model
+        #wireframe
+          | toggle lamina
+          span.icon &nbsp;&smashp;
+        #navigation
+          .nav
+            span.icon &oast;&nbsp;
+            | genome
+      script.
+        var data = !{data}
+      script(type='x-shader/x-vertex' id='vertexShader').
+        varying vec2 vUv;
+        varying float noise;
+        attribute float alpha;
+        varying float vAlpha;
+        varying vec3 vColor;
+        void main() {
+          vAlpha = alpha;
+          vUv = uv;
+          vColor = color;
+          gl_PointSize = 1.1;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      script(type='x-shader/x-fragment' id='fragmentShader').
+        varying vec2 vUv;
+        varying float noise;
+        varying float vAlpha;
+        varying vec3 vColor;
+        uniform vec3 colorsa;
+        void main() {
+          gl_FragColor = vec4(vColor, vAlpha);
+        }
+      script(src='/js/lib/d3.js')
+      script(src='/js/lib/three.min.js')
+      script(src='/js/lib/jquery.js')
+      script(src='/js/lib/d3.js')
+      script(src='/js/lib/CanvasRenderer.js')
+      script(src='/js/lib/TrackballControls.js')
+      script(src='/js/lib/Projector.js')
+      script(src='/js/lib/stats.js')
+      script(src='/js/lib/queue.js')
+      script(src='/js/helpers.js')
+      script(src='/js/listeners.js')
+      script(src='/js/interface.js')

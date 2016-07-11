@@ -1,0 +1,29 @@
+{
+  "name": "3ddna",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "dependencies": {
+    "express": "^4.14.0",
+    "fs": "0.0.2",
+    "jade": "^1.11.0",
+    "multer": "^1.1.0",
+    "querystring": "^0.2.0",
+    "stylus": "^0.54.5",
+    "underscore": "^1.8.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/petepolack/3ddna.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/petepolack/3ddna/issues"
+  },
+  "homepage": "https://github.com/petepolack/3ddna#readme"
+}

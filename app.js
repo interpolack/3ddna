@@ -1,0 +1,36 @@
+var express = require('express')
+var app = express()
+var stylus = require('stylus')
+var multer = require('multer')
+var upload = multer({dest: 'public/uploads/'})
+
+function compile(str, path) {
+  return stylus(str).set('filename', path)
+}
+app.set('views', __dirname + '/views')
+app.set('view engine', 'jade')
+app.use(stylus.middleware({
+  src: __dirname + '/public',
+  compile: compile,
+}))
+app.use(express.static(__dirname + '/public'))
+
+app.get('/', function(req, res) {
+  res.render('index')
+})
+
+app.get('/interface', function(req, res) {
+  var filename = app.get('filename')
+  res.render('interface', {data: JSON.stringify({'filename': filename})})
+})
+
+app.post('/load3D', upload.single('coordinates'), function(req, res) {
+  var filename = req.file.filename
+  app.set('filename', filename)
+  res.redirect('/interface')
+  res.status(204).end()
+})
+
+app.listen(5000, function() {
+  console.log('listening on port 5000')
+})

@@ -251,7 +251,7 @@ function loadPDB(resolution) {
   chromosomes = []
 
   var q = queue(1)
-  q.defer(d3.text, 'data/Model_' + resolution + '.pdb')
+  q.defer(d3.text, 'data/structure_2')
   q.defer(d3.text, 'data/Model_' + resolution + '.pml')
   q.defer(d3.text, 'data/0hr-Xist_' + resolution)
   q.defer(d3.text, 'data/1hr-Xist_' + resolution)
@@ -259,44 +259,39 @@ function loadPDB(resolution) {
   q.defer(d3.text, 'data/3hr-Xist_' + resolution)
   q.defer(d3.text, 'data/6hr-Xist_' + resolution)
   q.awaitAll(function(error, results){
-      segments = results[1].split('\n')
-      for (var i = segments.length - 1; i >= 0; i--) {
-        var line = segments[i]
-        if (line.substring(0, 6) != "select") segments.splice(i, 1)
-        else {
-          var split = segments[i].split(' ')[2].split('-')
-          segments[i] = [parseInt(split[0]) - 1, parseInt(split[1]) - 1]
-        }
-      }
-      segments.reverse()
-      var length = segments.length
-      var last = segments[length - 1][1]
-      for (var i = 0; i < length; i++) {
-        chromosomes.push({
-          'chromosome': i,
-          'contacts': new Array(resolution == '40kb' ? length * 2 : length)
-        })
-        if (resolution == '40kb') segments.push([segments[i][0] + last, segments[i][1] + last])
-      }
       pdb = results[0].split('\n')
-      chromosome = 0
+      var chromosome = -1
+      var chr = null
+      var index = -1
       for (var i = 0; i < pdb.length - 1; i++) {
-        if (i > segments[chromosome][1]) chromosome++
+        var row = pdb[i].split('\t')
+        var location = row[1].split(' ')
+        if (chr != location[0].substring(3)) {
+          segments.push([index, i - 1])
+          chromosome++
+          chromosomes.push({
+            'chromosome': chromosome,
+            'contacts': new Array(40)
+          })
+          index = i
+          chr = location[0].substring(3)
+        }
         all.push({
           'chromosome': chromosome,
           'bin': i,
-          'x3': parseFloat(pdb[i].substring(31,37)),
-          'y3': parseFloat(pdb[i].substring(38,45)),
-          'z3': parseFloat(pdb[i].substring(46,53)),
-          'lamina': parseInt(pdb[i].substring(61,64)),
+          'x3': parseFloat(row[2]),
+          'y3': parseFloat(row[3]),
+          'z3': parseFloat(row[4]),
           'rap0': 0.0,
           'rap1': 0.0,
           'rap2': 0.0,
           'rap3': 0.0,
           'rap4': 0.0,
+          'contacts': [],
         })
       }
-      loaded['lamina'] = true
+      segments.shift()
+      segments.push([index, i - 1])
       for (var d = 0; d < 5; d++) {
         loaded['rap' + d] = true
         rap = results[d + 2].split('\n')
@@ -308,7 +303,6 @@ function loadPDB(resolution) {
       }
       for (var a = 0; a < all.length; a++) {
         var binA = all[a]
-        binA.contacts = []
         for (var b = 0; b < all.length; b++) {
           if (a == b) continue
           var binB = all[b]
@@ -497,7 +491,7 @@ function modelGenome() {
     var segment = segments[i]
     var curve = new THREE.CatmullRomCurve3(
       all.slice(segment[0], segment[1]).map(function(values, bin){
-        return new THREE.Vector3((values.x3 - 100), (values.y3 - 100), (values.z3 - 100))
+        return new THREE.Vector3(values.x3, values.y3, values.z3)
       })
     )
 
@@ -934,7 +928,7 @@ function onDocumentMouseMove(event) {
       var total = bufferGeometry[chromosome].attributes.alpha.count
       var bins = segments[chromosome][1] - segments[chromosome][0]
       var bin = parseInt(faceIndex / total * bins)
-      alphaModel(0.2)
+      alphaModel(0.2, navigation[navigated].chromosomes)
       alphaBin(chromosome, bin, 1)
       var node = graph.chromosomes.nodesDict[chromosome + ':' + bin]
       graph.svg.selectAll('.node').attr('opacity', function(d,i){ return i == node ? 1 : 0.2 })

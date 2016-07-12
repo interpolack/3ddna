@@ -4,7 +4,19 @@ html
     title 3DNA
     link(rel='stylesheet', href='/stylesheets/main.css')
     body
-      &hercon;
+      p Load 3D genome coordinates. File format:
+      div.code
+        | 0 <span>\t</span> chr1 3000000 <span>\t</span> -10.0000 <span>\t</span> 10.0000 <span>\t</span> 0.0000
+        | 1 <span>\t</span> chr1 4000000 <span>\t</span> 0.0000 <span>\t</span> -10.0000 <span>\t</span> 10.0000
+        | 2 <span>\t</span> chr1 5000000 <span>\t</span> 10.0000 <span>\t</span> 0.0000 <span>\t</span> -10.0000
+      br
+      br
       form(action='/load3D', method='post', enctype='multipart/form-data')
-        input(type='file', name='coordinates')
-        input(type='submit', value='load')
+        | A&nbsp;&hercon;&nbsp;
+        input(type='file', name='coordinatesA')
+        br
+        | B&nbsp;&hercon;&nbsp;
+        input(type='file', name='coordinatesB')
+        br
+        br
+        input(type='submit', value='Load')

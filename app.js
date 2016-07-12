@@ -20,13 +20,18 @@ app.get('/', function(req, res) {
 })
 
 app.get('/interface', function(req, res) {
-  var filename = app.get('filename')
-  res.render('interface', {data: JSON.stringify({'filename': filename})})
+  var coordinatesA = app.get('coordinatesA')
+  var coordinatesB = app.get('coordinatesB')
+  res.render('interface', {data: JSON.stringify({
+    'coordinatesA': coordinatesA,
+    'coordinatesB': coordinatesB,
+  })})
 })
 
-app.post('/load3D', upload.single('coordinates'), function(req, res) {
-  var filename = req.file.filename
-  app.set('filename', filename)
+app.post('/load3D', upload.any(), function(req, res) {
+  req.files.map(function(file, i) {
+    app.set(file.fieldname, file.filename)
+  })
   res.redirect('/interface')
   res.status(204).end()
 })

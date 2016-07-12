@@ -14,6 +14,7 @@ var rainbow = d3.scale.category20(),
     initialHeight = window.innerHeight,
 
     all = [],
+    genomes = [],
     pdb = [],
     segments = [],
     rap = [],
@@ -54,14 +55,16 @@ loadPDB('1Mb')
 
 function loadPDB(resolution) {
   all = []
+  genomes = []
   pdb = []
   segments = []
-  rap = []
   chromosomes = []
 
   var q = queue(1)
-  q.defer(d3.text, 'uploads/' + data.filename)
+  q.defer(d3.text, 'uploads/' + data.coordinatesA)
+  if (data.coordinatesB != null) q.defer(d3.text, 'uploads/' + data.coordinatesB)
   q.awaitAll(function(error, results){
+
       pdb = results[0].split('\n')
       var chromosome = -1
       var chr = null
@@ -70,11 +73,10 @@ function loadPDB(resolution) {
         var row = pdb[i].split('\t')
         var location = row[1].split(' ')
         if (chr != location[0].substring(3)) {
-          segments.push([index, i - 1])
           chromosome++
+          segments.push([index, i - 1])
           chromosomes.push({
             'chromosome': chromosome,
-            'contacts': new Array(40)
           })
           index = i
           chr = location[0].substring(3)
@@ -82,44 +84,79 @@ function loadPDB(resolution) {
         all.push({
           'chromosome': chromosome,
           'bin': i,
-          'x3': parseFloat(row[2]),
-          'y3': parseFloat(row[3]),
-          'z3': parseFloat(row[4]),
-          'rap0': 0.0,
-          'rap1': 0.0,
-          'rap2': 0.0,
-          'rap3': 0.0,
-          'rap4': 0.0,
-          'contacts': [],
         })
       }
       segments.shift()
       segments.push([index, i - 1])
-      for (var a = 0; a < all.length; a++) {
-        var binA = all[a]
-        for (var b = 0; b < all.length; b++) {
-          if (a == b) continue
-          var binB = all[b]
-          var distance = distanceToSquared(binA.x3, binA.y3, binA.z3, binB.x3, binB.y3, binB.z3)
-          binA.contacts.push(distance)
 
-          var ic = chromosomes[binA.chromosome].contacts[binB.chromosome]
-          chromosomes[binA.chromosome].contacts[binB.chromosome] = ic == null ? 0 : ic + distance
+      for (var r = 0; r < results.length; r++) {
+        pdb = results[r].split('\n')
+        var bins = []
+        for (var i = 0; i < pdb.length - 1; i++) {
+          var row = pdb[i].split('\t')
+          bins.push({
+            'x': parseFloat(row[2]),
+            'y': parseFloat(row[3]),
+            'z': parseFloat(row[4]),
+          })
+        }
+        genomes.push({
+          'bins': bins,
+          'chromosomes': [],
+        })
+      }
+
+      for (var g = 0; g < genomes.length; g++) {
+        var genome = genomes[g]
+        for (var i = 0; i < segments.length; i++) {
+          var segment = segments[i]
+          var x = 0
+          var y = 0
+          var z = 0
+          for (var s = segment[0]; s < segment[1]; s++) {
+            x += genome.bins[s].x
+            y += genome.bins[s].y
+            z += genome.bins[s].z
+          }
+          var bins = segment[1] - segment[0]
+          x /= bins
+          y /= bins
+          z /= bins
+          genome.chromosomes.push({
+            'x': x,
+            'y': y,
+            'z': z,
+          })
         }
       }
-      for (var i = 0; i < chromosomes.length; i++) {
-        var binsA = segments[i][1] - segments[i][0]
-        chromosomes[i].weighted = [] // this is fair but isolates non-localized chromosomes (like active X)
-        for (var j = 0; j < chromosomes[i].contacts.length; j++) {
-          var binsB = segments[j][1] - segments[j][0]
-          chromosomes[i].weighted.push(chromosomes[i].contacts[j] / (binsA + binsB))
-        }
-      }
+
+      console.log(genomes)
+
+      // for (var a = 0; a < all.length; a++) {
+      //   var binA = all[a]
+      //   for (var b = 0; b < all.length; b++) {
+      //     if (a == b) continue
+      //     var binB = all[b]
+      //     var distance = distanceToSquared(binA['genome' + r].x, binA['genome' + r].y, binA['genome' + r].z, binB['genome' + r].x, binB['genome' + r].y, binB['genome' + r].z)
+      //
+      //     var ic = chromosomes[binA.chromosome]['genome' + r].contacts[binB.chromosome]
+      //     chromosomes[binA.chromosome]['genome' + r].contacts[binB.chromosome] = ic == null ? 0 : ic + distance
+      //   }
+      // }
+      // for (var i = 0; i < chromosomes.length; i++) {
+      //   var binsA = segments[i][1] - segments[i][0]
+      //   chromosomes[i]['genome' + r].weighted = [] // this is fair but isolates non-localized chromosomes (like active X)
+      //   for (var j = 0; j < chromosomes[i]['genome' + r].contacts.length; j++) {
+      //     var binsB = segments[j][1] - segments[j][0]
+      //     chromosomes[i]['genome' + r].weighted.push(chromosomes[i]['genome' + r].contacts[j] / (binsA + binsB))
+      //   }
+      // }
+
       if (launch) init()
-      // plotGenome()
       graphGenome()
       modelGenome()
-    })
+
+  })
 }
 
 function init() {
@@ -284,8 +321,8 @@ function modelGenome() {
   for (var i = 0; i < segments.length; i++) {
     var segment = segments[i]
     var curve = new THREE.CatmullRomCurve3(
-      all.slice(segment[0], segment[1]).map(function(values, bin){
-        return new THREE.Vector3(values.x3, values.y3, values.z3)
+      genomes[0].bins.slice(segment[0], segment[1]).map(function(values, bin){
+        return new THREE.Vector3(values.x, values.y, values.z)
       })
     )
 
@@ -324,30 +361,6 @@ function modelGenome() {
 
 }
 
-function plotGenome() {
-  var size = 200 / 40
-
-  var mg = matrix.genome = {}
-
-  var row = matrix.layer1.selectAll('.row')
-    .data(chromosomes)
-  var rowEnter = row.enter().append('g')
-    .attr('transform', function(d,i){ return 'translate(0,' + (d.chromosome * size) + ')' })
-    .attr('class', 'row')
-  rowEnter.each(function(d){
-    var rowThis = d3.select(this)
-    d.weighted.forEach(function(contact,c){
-      contact = 255 - contact / 25
-      rowThis.append('rect')
-        .attr('width', size)
-        .attr('height', size)
-        .attr('y', 0)
-        .attr('x', c * size)
-        .attr('fill', d.chromosome == c ? rainbow(c) : d3.rgb(contact, contact, contact))
-    })
-  })
-}
-
 function graphGenome() {
   graph.svg.selectAll('.node,.link').remove()
   pinned = 0
@@ -357,16 +370,30 @@ function graphGenome() {
   gg.force = d3.layout.force()
     .size([width / 2, height])
     .charge(-300)
-    .linkStrength(function(d){ return Math.sqrt(d.distance) / 500 })
+    .linkStrength(function(d){ return Math.sqrt(d.distance) / 20 })
   gg.nodes = chromosomes
   gg.links = []
   gg.linked = {}
 
+  var threshold = 50
   for (var i = 0; i < gg.nodes.length; i++) {
     var chromosome = gg.nodes[i]
     for (var j = 0; j < gg.nodes.length; j++) {
-      if (chromosome.weighted[j] < 6000 && gg.linked[j] == null) {
-        gg.links.push({'source': i, 'target': j, 'distance': chromosome.weighted[j]})
+      if (i == j) continue
+      var distances = 0
+      var passing = true
+      for (var g = 0; g < genomes.length; g++) {
+        var distance = distanceToSquared(genomes[g].chromosomes[i].x, genomes[g].chromosomes[i].y, genomes[g].chromosomes[i].z, genomes[g].chromosomes[j].x, genomes[g].chromosomes[j].y, genomes[g].chromosomes[j].z)
+        if (distance >= threshold) passing = false
+        distances += distance
+      }
+      distances /= genomes.length
+      if (passing && gg.linked[j] == null) {
+        gg.links.push({
+          'source': i,
+          'target': j,
+          'distance': distances,
+        })
         gg.linked[i] = true
       }
     }
@@ -429,7 +456,7 @@ function graphGenome() {
 
   var link = graph.layer1.selectAll('.link')
     .data(gg.links).enter().append('line')
-    .attr('stroke-width', 2)
+    .attr('stroke-width', 2 * genomes.length)
     .attr('stroke', '#555')
     .attr('opacity', 1)
     .attr('class', 'link interchromosomal')
@@ -473,8 +500,7 @@ function graphChromosomes(chr) {
   var cg = graph.chromosomes = {}
   cg.force = d3.layout.force()
     .size([width / 2, height])
-    .linkDistance(function(d){ return d.distance * 3 })
-    // .linkStrength(10)
+    .linkDistance(function(d){ return d.distance * 10 })
     // .charge(-100)
   cg.nodes = []
   cg.nodesDict = {}
@@ -490,18 +516,27 @@ function graphChromosomes(chr) {
     }
   }
 
+  var threshold = 5
   for (var i = 0; i < cg.nodes.length; i++) {
     cg.nodes[i].pinned = false
     var bin = cg.nodes[i]
     for (var j = 0; j < cg.nodes.length; j++) {
       if (i == j) continue
       var con = cg.nodes[j].bin
-      if (bin.contacts[con] < 5 && cg.linked[con] == null) {
+      var distances = 0
+      var passing = true
+      for (var g = 0; g < genomes.length; g++) {
+        var distance = distanceToSquared(genomes[g].bins[bin.bin].x, genomes[g].bins[bin.bin].y, genomes[g].bins[bin.bin].z, genomes[g].bins[cg.nodes[j].bin].x, genomes[g].bins[cg.nodes[j].bin].y, genomes[g].bins[cg.nodes[j].bin].z)
+        if (distance >= threshold) passing = false
+        distances += distance
+      }
+      distances /= genomes.length
+      if (passing && cg.linked[con] == null) {
         cg.links.push({
           'source': i,
           'target': j,
-          'distance': bin.contacts[con],
-          'physical': Math.abs(j - i) == 1 && cg.nodes[i].chromosome == cg.nodes[j].chromosome ? cg.nodes[i].chromosome : false
+          'distance': distances,
+          'physical': Math.abs(j - i) == 1 && cg.nodes[i].chromosome == cg.nodes[j].chromosome ? cg.nodes[i].chromosome : -1
         })
         cg.linked[bin.bin] = true
       }
@@ -572,9 +607,9 @@ function graphChromosomes(chr) {
 
   var link = graph.layer1.selectAll('.link')
     .data(cg.links).enter().append('line')
-    .attr('stroke-width', 1)
-    .attr('stroke', function(d){ return d.physical || d.physical === 0 ? rainbow(d.physical) : '#fff' })
-    .attr('opacity', function(d){ return d.physical || d.physical === 0 ? 1 : 0.2 })
+    .attr('stroke-width', function(d){ return genomes.length })
+    .attr('stroke', function(d){ return d.physical >= 0 ? rainbow(d.physical) : '#fff' })
+    .attr('opacity', function(d){ return d.physical >= 0 ? 1 : 0.2 })
     .attr('class', 'link interbin')
 
   cg.force

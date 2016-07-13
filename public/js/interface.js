@@ -3,7 +3,6 @@ var rainbow = d3.scale.category20(),
     resolution = '1Mb',
     cgSize = 300,
     graphCap = 1000,
-    graphThreshold = 4,
     mapCap,
 
     graph = {},
@@ -64,98 +63,74 @@ function loadPDB(resolution) {
   q.defer(d3.text, 'uploads/' + data.coordinatesA)
   if (data.coordinatesB != null) q.defer(d3.text, 'uploads/' + data.coordinatesB)
   q.awaitAll(function(error, results){
+    pdb = results[0].split('\n')
+    var chromosome = -1
+    var chr = null
+    var index = -1
+    for (var i = 0; i < pdb.length - 1; i++) {
+      var row = pdb[i].split('\t')
+      var location = row[1].split(' ')
+      if (chr != location[0].substring(3)) {
+        chromosome++
+        segments.push([index, i - 1])
+        chromosomes.push({
+          'chromosome': chromosome,
+        })
+        index = i
+        chr = location[0].substring(3)
+      }
+      all.push({
+        'chromosome': chromosome,
+        'bin': i,
+      })
+    }
+    segments.shift()
+    segments.push([index, i - 1])
 
-      pdb = results[0].split('\n')
-      var chromosome = -1
-      var chr = null
-      var index = -1
+    for (var r = 0; r < results.length; r++) {
+      pdb = results[r].split('\n')
+      var bins = []
       for (var i = 0; i < pdb.length - 1; i++) {
         var row = pdb[i].split('\t')
-        var location = row[1].split(' ')
-        if (chr != location[0].substring(3)) {
-          chromosome++
-          segments.push([index, i - 1])
-          chromosomes.push({
-            'chromosome': chromosome,
-          })
-          index = i
-          chr = location[0].substring(3)
-        }
-        all.push({
-          'chromosome': chromosome,
-          'bin': i,
+        bins.push({
+          'x': parseFloat(row[2]),
+          'y': parseFloat(row[3]),
+          'z': parseFloat(row[4]),
         })
       }
-      segments.shift()
-      segments.push([index, i - 1])
+      genomes.push({
+        'bins': bins,
+        'chromosomes': [],
+      })
+    }
 
-      for (var r = 0; r < results.length; r++) {
-        pdb = results[r].split('\n')
-        var bins = []
-        for (var i = 0; i < pdb.length - 1; i++) {
-          var row = pdb[i].split('\t')
-          bins.push({
-            'x': parseFloat(row[2]),
-            'y': parseFloat(row[3]),
-            'z': parseFloat(row[4]),
-          })
+    for (var g = 0; g < genomes.length; g++) {
+      var genome = genomes[g]
+      for (var i = 0; i < segments.length; i++) {
+        var segment = segments[i]
+        var x = 0
+        var y = 0
+        var z = 0
+        for (var s = segment[0]; s < segment[1]; s++) {
+          x += genome.bins[s].x
+          y += genome.bins[s].y
+          z += genome.bins[s].z
         }
-        genomes.push({
-          'bins': bins,
-          'chromosomes': [],
+        var bins = segment[1] - segment[0]
+        x /= bins
+        y /= bins
+        z /= bins
+        genome.chromosomes.push({
+          'x': x,
+          'y': y,
+          'z': z,
         })
       }
+    }
 
-      for (var g = 0; g < genomes.length; g++) {
-        var genome = genomes[g]
-        for (var i = 0; i < segments.length; i++) {
-          var segment = segments[i]
-          var x = 0
-          var y = 0
-          var z = 0
-          for (var s = segment[0]; s < segment[1]; s++) {
-            x += genome.bins[s].x
-            y += genome.bins[s].y
-            z += genome.bins[s].z
-          }
-          var bins = segment[1] - segment[0]
-          x /= bins
-          y /= bins
-          z /= bins
-          genome.chromosomes.push({
-            'x': x,
-            'y': y,
-            'z': z,
-          })
-        }
-      }
-
-      console.log(genomes)
-
-      // for (var a = 0; a < all.length; a++) {
-      //   var binA = all[a]
-      //   for (var b = 0; b < all.length; b++) {
-      //     if (a == b) continue
-      //     var binB = all[b]
-      //     var distance = distanceToSquared(binA['genome' + r].x, binA['genome' + r].y, binA['genome' + r].z, binB['genome' + r].x, binB['genome' + r].y, binB['genome' + r].z)
-      //
-      //     var ic = chromosomes[binA.chromosome]['genome' + r].contacts[binB.chromosome]
-      //     chromosomes[binA.chromosome]['genome' + r].contacts[binB.chromosome] = ic == null ? 0 : ic + distance
-      //   }
-      // }
-      // for (var i = 0; i < chromosomes.length; i++) {
-      //   var binsA = segments[i][1] - segments[i][0]
-      //   chromosomes[i]['genome' + r].weighted = [] // this is fair but isolates non-localized chromosomes (like active X)
-      //   for (var j = 0; j < chromosomes[i]['genome' + r].contacts.length; j++) {
-      //     var binsB = segments[j][1] - segments[j][0]
-      //     chromosomes[i]['genome' + r].weighted.push(chromosomes[i]['genome' + r].contacts[j] / (binsA + binsB))
-      //   }
-      // }
-
-      if (launch) init()
-      graphGenome()
-      modelGenome()
-
+    if (launch) init()
+    graphGenome()
+    modelGenome()
   })
 }
 
@@ -177,12 +152,6 @@ function init() {
   graph.layer2 = graph.container.append('g')
   graph.layer3 = graph.container.append('g')
   graph.layer4 = graph.container.append('g')
-
-  // matrix.svg = d3.select('#matrix').append('svg')
-  //   .attr('width', 200)
-  //   .attr('height', 200)
-  // matrix.layer1 = matrix.svg.append('g')
-  // matrix.layer2 = matrix.svg.append('g')
 
   linear.svg = d3.select('#linear').append('svg')
     .attr('width', width / 2)
@@ -210,8 +179,9 @@ function init() {
   navigation.push({
     'context': 'genome',
     'node': 'chromosome',
-    'link': 'weighted',
+    'link': 'and',
     'locus': new THREE.Vector3(0, 0, 0),
+    'threshold': genomes.length * 40,
   })
 
   $('#navigation').on('click', '.nav', function(){
@@ -234,6 +204,16 @@ function init() {
     $(this).css('color', sphere.visible ? '#fff' : '#666')
   })
 
+  $('#threshold').val(genomes.length * 40)
+  $('#threshold').on('input', function(event) {
+    var threshold = $(this).val()
+    navigation[navigated].threshold = threshold
+    var g = graph[navigation[navigated].context]
+    var links = navigation[navigated].context == 'genome' ? linkGenome(g.nodes) : linkChromosomes(g.nodes)
+    g.force.links(links).start()
+    bakeForce(g.force, links.length)
+  })
+
   animate()
 
 }
@@ -242,6 +222,7 @@ function navigate(nav) {
   $('#navigation>.nav').addClass('inactive')
   $('#navigation>.nav:eq(' + nav + ')').removeClass('inactive')
 
+  $('#threshold').val(navigation[nav].threshold)
   controls.target.copy(navigation[nav].locus)
   camera.position.copy(navigation[nav].locus)
   camera.position.setZ(30)
@@ -361,6 +342,42 @@ function modelGenome() {
 
 }
 
+function linkGenome(nodes) {
+  graph.svg.selectAll('.link').remove()
+  var threshold = $('#threshold').val()
+  var links = []
+  var linked = {}
+  for (var i = 0; i < nodes.length; i++) {
+    var chromosome = nodes[i]
+    for (var j = 0; j < nodes.length; j++) {
+      if (i == j) continue
+      var distances = 0
+      var passing = true
+      for (var g = 0; g < genomes.length; g++) {
+        var distance = distanceToSquared(genomes[g].chromosomes[i].x, genomes[g].chromosomes[i].y, genomes[g].chromosomes[i].z, genomes[g].chromosomes[j].x, genomes[g].chromosomes[j].y, genomes[g].chromosomes[j].z)
+        if (distance >= threshold) passing = false
+        distances += distance
+      }
+      distances /= genomes.length
+      if (passing && linked[j] == null) {
+        links.push({
+          'source': i,
+          'target': j,
+          'distance': distances,
+        })
+        linked[i] = true
+      }
+    }
+  }
+  graph.layer1.selectAll('.link')
+    .data(links).enter().append('line')
+    .attr('stroke-width', 2)
+    .attr('stroke', '#555')
+    .attr('opacity', 1)
+    .attr('class', 'link interchromosomal')
+  return links
+}
+
 function graphGenome() {
   graph.svg.selectAll('.node,.link').remove()
   pinned = 0
@@ -372,32 +389,7 @@ function graphGenome() {
     .charge(-300)
     .linkStrength(function(d){ return Math.sqrt(d.distance) / 20 })
   gg.nodes = chromosomes
-  gg.links = []
-  gg.linked = {}
-
-  var threshold = 50
-  for (var i = 0; i < gg.nodes.length; i++) {
-    var chromosome = gg.nodes[i]
-    for (var j = 0; j < gg.nodes.length; j++) {
-      if (i == j) continue
-      var distances = 0
-      var passing = true
-      for (var g = 0; g < genomes.length; g++) {
-        var distance = distanceToSquared(genomes[g].chromosomes[i].x, genomes[g].chromosomes[i].y, genomes[g].chromosomes[i].z, genomes[g].chromosomes[j].x, genomes[g].chromosomes[j].y, genomes[g].chromosomes[j].z)
-        if (distance >= threshold) passing = false
-        distances += distance
-      }
-      distances /= genomes.length
-      if (passing && gg.linked[j] == null) {
-        gg.links.push({
-          'source': i,
-          'target': j,
-          'distance': distances,
-        })
-        gg.linked[i] = true
-      }
-    }
-  }
+  gg.links = linkGenome(gg.nodes)
 
   var node = graph.layer2.selectAll('.node')
     .data(gg.nodes)
@@ -454,28 +446,10 @@ function graphGenome() {
     $('#unpin').css('visibility', pinned == 0 ? 'hidden' : 'visible')
   })
 
-  var link = graph.layer1.selectAll('.link')
-    .data(gg.links).enter().append('line')
-    .attr('stroke-width', 2 * genomes.length)
-    .attr('stroke', '#555')
-    .attr('opacity', 1)
-    .attr('class', 'link interchromosomal')
-
   graph.context = makeAbsoluteContext(graph.layer2[0][0], graph.svg[0][0])
 
-  gg.force
-    .nodes(gg.nodes)
-    .links(gg.links)
-    .start()
-  for (var i = 0; i < Math.pow(gg.nodes.length, 2); i++) gg.force.tick()
-  gg.force.stop()
-  node
-    .attr('transform', function(d,i){ return 'translate(' + d.x + ',' + d.y + ')'})
-  link
-    .attr('x1', function(d){ return d.source.x })
-    .attr('y1', function(d){ return d.source.y })
-    .attr('x2', function(d){ return d.target.x })
-    .attr('y2', function(d){ return d.target.y })
+  gg.force.nodes(gg.nodes).links(gg.links)
+  bakeForce(gg.force, gg.links.length)
 
   linear.svg.line = linear.svg.append('rect')
     .attr('rx', 5)
@@ -489,8 +463,53 @@ function graphGenome() {
   linear.lit = {}
 }
 
+function bakeForce(force, iterations) {
+  force.start()
+  for (var i = 0; i < iterations; i++) force.tick()
+  force.stop()
+  graph.svg.selectAll('.node')
+    .attr('transform', function(d,i){ return 'translate(' + d.x + ',' + d.y + ')'})
+  graph.svg.selectAll('.link')
+    .attr('x1', function(d){ return d.source.x })
+    .attr('y1', function(d){ return d.source.y })
+    .attr('x2', function(d){ return d.target.x })
+    .attr('y2', function(d){ return d.target.y })
+}
+
+function linkChromosomes(nodes) {
+  var threshold = $('#threshold').val()
+  links = []
+  linked = {}
+  for (var i = 0; i < nodes.length; i++) {
+    nodes[i].pinned = false
+    var bin = nodes[i]
+    for (var j = 0; j < nodes.length; j++) {
+      if (i == j) continue
+      var con = nodes[j].bin
+      var distances = 0
+      var passing = true
+      for (var g = 0; g < genomes.length; g++) {
+        var distance = distanceToSquared(genomes[g].bins[bin.bin].x, genomes[g].bins[bin.bin].y, genomes[g].bins[bin.bin].z, genomes[g].bins[nodes[j].bin].x, genomes[g].bins[nodes[j].bin].y, genomes[g].bins[nodes[j].bin].z)
+        if (distance >= threshold / 10) passing = false
+        distances += distance
+      }
+      distances /= genomes.length
+      if (passing && linked[con] == null) {
+        links.push({
+          'source': i,
+          'target': j,
+          'distance': distances,
+          'physical': Math.abs(j - i) == 1 && nodes[i].chromosome == nodes[j].chromosome ? nodes[i].chromosome : -1
+        })
+        linked[bin.bin] = true
+      }
+    }
+  }
+  return links
+}
+
 function graphChromosomes(chr) {
-  graph.svg.selectAll('.node,.link').remove()
+  graph.svg.selectAll('.node,.link,.chromosome').remove()
   pinned = 0
   for (var i = 0; i < chromosomes.length; i++) chromosomes[i].pinned = false
 
@@ -504,8 +523,6 @@ function graphChromosomes(chr) {
     // .charge(-100)
   cg.nodes = []
   cg.nodesDict = {}
-  cg.links = []
-  cg.linked = {}
   cg.chr = chr
 
   for (var i = 0; i < chr.length; i++) {
@@ -516,32 +533,7 @@ function graphChromosomes(chr) {
     }
   }
 
-  var threshold = 5
-  for (var i = 0; i < cg.nodes.length; i++) {
-    cg.nodes[i].pinned = false
-    var bin = cg.nodes[i]
-    for (var j = 0; j < cg.nodes.length; j++) {
-      if (i == j) continue
-      var con = cg.nodes[j].bin
-      var distances = 0
-      var passing = true
-      for (var g = 0; g < genomes.length; g++) {
-        var distance = distanceToSquared(genomes[g].bins[bin.bin].x, genomes[g].bins[bin.bin].y, genomes[g].bins[bin.bin].z, genomes[g].bins[cg.nodes[j].bin].x, genomes[g].bins[cg.nodes[j].bin].y, genomes[g].bins[cg.nodes[j].bin].z)
-        if (distance >= threshold) passing = false
-        distances += distance
-      }
-      distances /= genomes.length
-      if (passing && cg.linked[con] == null) {
-        cg.links.push({
-          'source': i,
-          'target': j,
-          'distance': distances,
-          'physical': Math.abs(j - i) == 1 && cg.nodes[i].chromosome == cg.nodes[j].chromosome ? cg.nodes[i].chromosome : -1
-        })
-        cg.linked[bin.bin] = true
-      }
-    }
-  }
+  cg.links = linkChromosomes(cg.nodes)
 
   var node = graph.layer2.selectAll('.node')
     .data(cg.nodes)
@@ -570,13 +562,23 @@ function graphChromosomes(chr) {
       }
       geometry.attributes.alpha.needsUpdate = true
     }
-    if (!d.pinned) linear.svg.append('line')
-      .attr('stroke', rainbow(d.chromosome))
-      .attr('x1', 20 + d.bin * linear.ratio)
-      .attr('x2', 20 + d.bin * linear.ratio)
-      .attr('y1', 70 + 0)
-      .attr('y2', 70 + 10)
-      .attr('class', 'active highlight chr' + d.chromosome + '-' + d.bin)
+    if (!d.pinned) {
+      linear.svg.append('line')
+        .attr('stroke', rainbow(d.chromosome))
+        .attr('x1', 20 + d.bin * linear.ratio)
+        .attr('x2', 20 + d.bin * linear.ratio)
+        .attr('y1', 70 + 0)
+        .attr('y2', 70 + 10)
+        .attr('class', 'active highlight chr' + d.chromosome + '-' + d.bin)
+      var ratio = 1 / (segments[0][1] - segments[0][0]) * ((width / 2) - 70)
+      linear.svg.chromosomes[d.chromosome].append('line')
+        .attr('stroke', rainbow(d.chromosome))
+        .attr('x1', 15 + 20 + (d.bin - segments[d.chromosome][0]) * ratio)
+        .attr('x2', 15 + 20 + (d.bin - segments[d.chromosome][0]) * ratio)
+        .attr('y1', 0)
+        .attr('y2', 10)
+        .attr('class', 'active highlight chr' + d.chromosome + '-' + d.bin)
+    }
   })
   nodeEnter.on('mouseout', function(d){
     if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
@@ -612,19 +614,8 @@ function graphChromosomes(chr) {
     .attr('opacity', function(d){ return d.physical >= 0 ? 1 : 0.2 })
     .attr('class', 'link interbin')
 
-  cg.force
-    .nodes(cg.nodes)
-    .links(cg.links)
-    .start()
-  for (var i = 0; i < Math.pow(cg.nodes.length, 2); i++) cg.force.tick()
-  cg.force.stop()
-  node
-    .attr('transform', function(d,i){ return 'translate(' + d.x + ',' + d.y + ')'})
-  link
-    .attr('x1', function(d){ return d.source.x })
-    .attr('y1', function(d){ return d.source.y })
-    .attr('x2', function(d){ return d.target.x })
-    .attr('y2', function(d){ return d.target.y })
+  cg.force.nodes(cg.nodes).links(cg.links).start()
+  bakeForce(cg.force, cg.links.length)
 
   linear.svg.chromosomes = {}
   var longest = segments[0][1] - segments[0][0]

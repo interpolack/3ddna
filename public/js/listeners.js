@@ -11,7 +11,7 @@ function onWindowResize() {
 }
 
 function onDocumentMouseMove(event) {
-  event.preventDefault()
+  // event.preventDefault()
   mouse.x = ((event.clientX - (width / 2)) / renderer.domElement.clientWidth) * 2 - 1
   mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1
 
@@ -161,9 +161,10 @@ function onDocumentKeyUp(event) {
       navigation.push({
         'context': 'chromosomes',
         'node': '1Mb',
-        'link': 'distance',
+        'link': 'and',
         'chromosomes': pin,
         'locus': locus,
+        'threshold': genomes.length * 40,
       })
     } else if (navigation[navigated].context == 'chromosomes') {
       var pin = []
@@ -200,6 +201,7 @@ function onDocumentKeyUp(event) {
         'bins': pin,
         'nodes': nin,
         'locus': locus,
+        'threshold': genomes.length * 40,
       })
     }
     navigate(navigation.length - 1)

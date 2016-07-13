@@ -6,17 +6,19 @@ html
     body
       #left
         #controls
-          span.icon &ocir;&nbsp;
-          select#node
-            option(value='chromosome') chromosome
-            option(value='1Mb') 1Mb
-          br
-          span.icon &origof;&nbsp;
-          select#link
-            option(value='weighted') centroids
-            option(value='distance') distance
-          br
-          span.icon &xopf;&nbsp;
+          #settings
+            .set
+              span.icon &ocir;
+              select#node
+                option(value='chromosome') chromosome
+                option(value='1Mb') 1Mb bin
+            .set
+              span.icon &origof;
+              select#link
+                option(value='and') ( A&and;B ) &le; X
+                option(value='or') ( A&or;B ) &le; X
+              input#threshold(type='range' value=50 min=0 max=100 step=1)
+          span.icon &xopf;
           input#search(type='text')
           br
         #unpin &Cross; &cirmid;&nbsp;

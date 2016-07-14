@@ -176,12 +176,13 @@ function init() {
   document.addEventListener('keyup', onDocumentKeyUp, false)
   document.addEventListener('keydown', onDocumentKeyDown, false)
 
+  var threshold = genomes.length * 25
   navigation.push({
     'context': 'genome',
     'node': 'chromosome',
     'link': 'and',
     'locus': new THREE.Vector3(0, 0, 0),
-    'threshold': genomes.length * 40,
+    'threshold': threshold,
   })
 
   $('#navigation').on('click', '.nav', function(){
@@ -204,14 +205,14 @@ function init() {
     $(this).css('color', sphere.visible ? '#fff' : '#666')
   })
 
-  $('#threshold').val(genomes.length * 40)
+  $('#threshold').val(threshold)
   $('#threshold').on('input', function(event) {
     var threshold = $(this).val()
     navigation[navigated].threshold = threshold
     var g = graph[navigation[navigated].context]
-    var links = navigation[navigated].context == 'genome' ? linkGenome(g.nodes) : linkChromosomes(g.nodes)
-    g.force.links(links).start()
-    bakeForce(g.force, links.length)
+    var build = navigation[navigated].context == 'genome' ? linkGenome(g.nodes) : linkChromosomes(g.nodes)
+    g.force.nodes(build[0]).links(build[1]).start()
+    bakeForce(g.force, build[1].length)
   })
 
   animate()
@@ -343,57 +344,131 @@ function modelGenome() {
 }
 
 function linkGenome(nodes) {
-  graph.svg.selectAll('.link').remove()
+  graph.svg.selectAll('.link,.shadow').remove()
+  if (nodes.length > chromosomes.length) nodes = nodes.slice(0, chromosomes.length)
   var threshold = $('#threshold').val()
   var links = []
   var linked = {}
-  for (var i = 0; i < nodes.length; i++) {
+  for (var i = 0; i < chromosomes.length; i++) {
     var chromosome = nodes[i]
-    for (var j = 0; j < nodes.length; j++) {
+    for (var j = 0; j < chromosomes.length; j++) {
       if (i == j) continue
-      var distances = 0
-      var passing = true
+      var distances = []
       for (var g = 0; g < genomes.length; g++) {
         var distance = distanceToSquared(genomes[g].chromosomes[i].x, genomes[g].chromosomes[i].y, genomes[g].chromosomes[i].z, genomes[g].chromosomes[j].x, genomes[g].chromosomes[j].y, genomes[g].chromosomes[j].z)
-        if (distance >= threshold) passing = false
-        distances += distance
+        distances.push(distance)
       }
-      distances /= genomes.length
-      if (passing && linked[j] == null) {
+      if (distances[0] < threshold && distances[1] < threshold && linked[j] == null) {
+        nodes[i].mutual = true
+        nodes[j].mutual = true
         links.push({
           'source': i,
           'target': j,
-          'distance': distances,
+          'distance': (distances[0] + distances[1]) / 2,
+          'affinity': -1,
+        })
+        linked[i] = true
+      } else if (distances[0] < threshold / 2 && linked[j] == null) {
+        links.push({
+          'source': i,
+          'target': j,
+          'distance': distances[0],
+          'affinity': 0,
         })
         linked[i] = true
       }
     }
   }
+
+  var both = true
+  if (both && genomes.length > 1) {
+    linked = {}
+    doubled = {}
+    var length = chromosomes.length
+    for (var i = 0; i < length; i++) {
+      var chromosome = nodes[i]
+      for (var j = 0; j < length; j++) {
+        if (i == j) continue
+        var distance = distanceToSquared(genomes[1].chromosomes[i].x, genomes[1].chromosomes[i].y, genomes[1].chromosomes[i].z, genomes[1].chromosomes[j].x, genomes[1].chromosomes[j].y, genomes[1].chromosomes[j].z)
+        if ((!nodes[i].mutual || !nodes[j].mutual) && (distance < threshold / 2) && linked[j] == null) {
+          var a, b
+          if (nodes[i].mutual) a = i
+          else if (doubled[nodes[i].chromosome]) a = doubled[nodes[i].chromosome]
+          else {
+            nodes.push($.extend(true, {}, nodes[i]))
+            nodes[nodes.length - 1].double = true
+            a = doubled[nodes[nodes.length - 1].chromosome] = nodes.length - 1
+          }
+          if (nodes[j].mutual) b = i
+          else if (doubled[nodes[j].chromosome]) b = doubled[nodes[j].chromosome]
+          else {
+            nodes.push($.extend(true, {}, nodes[j]))
+            nodes[nodes.length - 1].double = true
+            b = doubled[nodes[nodes.length - 1].chromosome] = nodes.length - 1
+          }
+          links.push({
+            'source': a,
+            'target': b,
+            'distance': distance,
+            'affinity': 1,
+          })
+        }
+      }
+    }
+  }
+
   graph.layer1.selectAll('.link')
     .data(links).enter().append('line')
+    .filter(function(d){ return d.affinity == 1 })
     .attr('stroke-width', 2)
-    .attr('stroke', '#555')
+    .attr('stroke', '#222')
     .attr('opacity', 1)
     .attr('class', 'link interchromosomal')
-  return links
+  graph.layer3.selectAll('.link')
+    .data(links).enter().append('line')
+    .filter(function(d){ return d.affinity <= 0 })
+    .attr('stroke-width', 2)
+    .attr('stroke', function(d){ return d.affinity == -1 ? '#ccc' : '#555' })
+    .attr('opacity', 1)
+    .attr('class', 'link interchromosomal')
+  var shadow = graph.layer2.selectAll('.shadow')
+    .data(nodes)
+  var shadowEnter = shadow.enter().append('g')
+    .filter(function(d){ return d.double })
+    .attr('class', 'node shadow')
+  shadowEnter.append('circle')
+    .attr('r', 8)
+    .attr('stroke', '#333')
+    .attr('stroke-width', 3)
+    .attr('fill', '#222')
+  shadowEnter.append('text')
+    .text(function(d){ return chromosomeName(d.chromosome) })
+    .attr('fill', '#333')
+    .attr('font-size', '8px')
+    .attr('y', 3)
+    .attr('text-anchor', 'middle')
+    .attr('font-weight', 700)
+
+  return [nodes, links]
 }
 
 function graphGenome() {
   graph.svg.selectAll('.node,.link').remove()
   pinned = 0
-  for (var i = 0; i < chromosomes.length; i++) chromosomes[i].pinned = false
 
   var gg = graph.genome = {}
   gg.force = d3.layout.force()
     .size([width / 2, height])
-    .charge(-300)
-    .linkStrength(function(d){ return Math.sqrt(d.distance) / 20 })
-  gg.nodes = chromosomes
-  gg.links = linkGenome(gg.nodes)
+    .charge(function(d){ return d.double ? 0 : -300 })
+    .linkStrength(function(d){ return Math.sqrt(d.distance) / 10 })
+  var build = linkGenome(JSON.parse(JSON.stringify(chromosomes)))
+  gg.nodes = build[0]
+  gg.links = build[1]
 
-  var node = graph.layer2.selectAll('.node')
+  var node = graph.layer4.selectAll('.node')
     .data(gg.nodes)
   var nodeEnter = node.enter().append('g')
+    .filter(function(d){ return !d.double })
     .attr('class', 'node chromosome')
   nodeEnter.append('circle')
     .attr('r', 8)
@@ -446,7 +521,7 @@ function graphGenome() {
     $('#unpin').css('visibility', pinned == 0 ? 'hidden' : 'visible')
   })
 
-  graph.context = makeAbsoluteContext(graph.layer2[0][0], graph.svg[0][0])
+  graph.context = makeAbsoluteContext(graph.layer4[0][0], graph.svg[0][0])
 
   gg.force.nodes(gg.nodes).links(gg.links)
   bakeForce(gg.force, gg.links.length)
@@ -505,7 +580,13 @@ function linkChromosomes(nodes) {
       }
     }
   }
-  return links
+  graph.layer3.selectAll('.link')
+    .data(links).enter().append('line')
+    .attr('stroke-width', function(d){ return genomes.length })
+    .attr('stroke', function(d){ return d.physical >= 0 ? rainbow(d.physical) : '#fff' })
+    .attr('opacity', function(d){ return d.physical >= 0 ? 1 : 0.2 })
+    .attr('class', 'link interbin')
+  return [nodes, links]
 }
 
 function graphChromosomes(chr) {
@@ -519,7 +600,7 @@ function graphChromosomes(chr) {
   var cg = graph.chromosomes = {}
   cg.force = d3.layout.force()
     .size([width / 2, height])
-    .linkDistance(function(d){ return d.distance * 10 })
+    .linkDistance(function(d){ return d.distance * 3 })
     // .charge(-100)
   cg.nodes = []
   cg.nodesDict = {}
@@ -533,9 +614,9 @@ function graphChromosomes(chr) {
     }
   }
 
-  cg.links = linkChromosomes(cg.nodes)
+  cg.links = linkChromosomes(cg.nodes)[1]
 
-  var node = graph.layer2.selectAll('.node')
+  var node = graph.layer4.selectAll('.node')
     .data(cg.nodes)
   var nodeEnter = node.enter().append('g')
     .attr('class', 'node bin')
@@ -606,13 +687,6 @@ function graphChromosomes(chr) {
     linear.svg.selectAll('.chr' + d.chromosome + '-' + d.bin).classed('pinned', d.pinned)
     $('#unpin').css('visibility', pinned == 0 ? 'hidden' : 'visible')
   })
-
-  var link = graph.layer1.selectAll('.link')
-    .data(cg.links).enter().append('line')
-    .attr('stroke-width', function(d){ return genomes.length })
-    .attr('stroke', function(d){ return d.physical >= 0 ? rainbow(d.physical) : '#fff' })
-    .attr('opacity', function(d){ return d.physical >= 0 ? 1 : 0.2 })
-    .attr('class', 'link interbin')
 
   cg.force.nodes(cg.nodes).links(cg.links).start()
   bakeForce(cg.force, cg.links.length)

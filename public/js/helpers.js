@@ -29,7 +29,7 @@ function alphaModel(alpha, visible) {
 }
 
 function lookup(chromosome, bins) {
-  var prefix = 'https://genome.ucsc.edu/cgi-bin/hgTracks?db=hg38&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position='
+  var prefix = 'https://genome.ucsc.edu/cgi-bin/hgTracks?db=mm10&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position='
   var suffix = '&hgsid=501888851_Vr81OkrPRrUhSo3kt4U7ITltFimU'
   var target = 'chr' + chromosomeName(chromosome) + '%3A' + (bins[0] * 1000000) + '-' + (bins[1] * 1000000)
   window.open(prefix + target + suffix, '_blank')

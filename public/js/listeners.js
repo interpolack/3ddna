@@ -100,14 +100,14 @@ function onDocumentMouseUp(event) {
             .attr('y2', 10)
             .attr('class', 'active highlight chr' + node.chromosome + '-' + node.bin)
         }
-        node.pinned = true
+        chromosomes[node.chromosome].pinned = node.pinned = true
         pinned++
       }
     }
     if (navigation[navigated].context == 'genome') {
       for (var i = 0; i < chromosomes.length; i++) {
         var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
-        if (pinned == 0 || nodes[i].pinned) for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.8
+        if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.8
         else for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.2
         bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
       }

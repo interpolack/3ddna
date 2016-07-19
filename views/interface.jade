@@ -6,31 +6,31 @@ html
     body
       #left
         #controls
+          input#search(type='text' placeholder='search')
           #settings
             .set
-              span.icon &ocir;
               select#node
-                option(value='chromosome') chromosome
+                option(value='chromosome') chr centroid
                 option(value='1Mb') 1Mb bin
+              span.icon &ocir;
             .set
-              span.icon &origof;
               select#link
-                option(value='and') ( A&and;B ) &le; X
+                option(value='and') all < threshold    
+              span.icon &origof;
+              br
               input#threshold(type='range' value=50 min=0 max=100 step=1)
-          span.icon &xopf;
-          input#search(type='text')
-          br
         #unpin &Cross; &cirmid;&nbsp;
         #linear
         #graph
-      #model
-        #wireframe
-          | toggle lamina
-          span.icon &nbsp;&smashp;
-        #navigation
-          .nav
-            span.icon &oast;&nbsp;
-            | genome
+          #navigation
+            .nav
+              span.icon &oast;
+              | genome
+      #genomes
+        #model
+          #wireframe
+            | toggle lamina
+            span.icon &nbsp;&smashp;
       script.
         var data = !{data}
       script(type='x-shader/x-vertex' id='vertexShader').

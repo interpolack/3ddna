@@ -22,9 +22,13 @@ app.get('/', function(req, res) {
 app.get('/interface', function(req, res) {
   var coordinatesA = app.get('coordinatesA')
   var coordinatesB = app.get('coordinatesB')
+  var coordinatesC = app.get('coordinatesC')
+  var coordinatesD = app.get('coordinatesD')
   res.render('interface', {data: JSON.stringify({
     'coordinatesA': coordinatesA,
     'coordinatesB': coordinatesB,
+    'coordinatesC': coordinatesC,
+    'coordinatesD': coordinatesD,
   })})
 })
 

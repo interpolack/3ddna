@@ -2,17 +2,17 @@ function onWindowResize() {
   width = window.innerWidth
   height = window.innerHeight
   graph.container.attr('transform', 'translate(' + ((width - initialWidth) / 4) + ',0)scale(' + (height / initialHeight) + ')')
-  graph.svg.attr('width', width / 2).attr('height', height)
-  linear.svg.attr('width', width / 2)
-  linear.svg.line.attr('width', (width / 2) - 50)
-  camera.aspect = width / height / 2
+  graph.svg.attr('width', width * windowRatio).attr('height', height)
+  linear.svg.attr('width', width * windowRatio)
+  linear.svg.line.attr('width', (width * windowRatio) - 50)
+  camera.aspect = width / (height - 250) * (1 - windowRatio)
   camera.updateProjectionMatrix()
-  renderer.setSize(width / 2, height)
+  renderer.setSize(width * (1 - windowRatio), height - 250)
 }
 
 function onDocumentMouseMove(event) {
   // event.preventDefault()
-  mouse.x = ((event.clientX - (width / 2)) / renderer.domElement.clientWidth) * 2 - 1
+  mouse.x = ((event.clientX - (width * windowRatio)) / renderer.domElement.clientWidth) * 2 - 1
   mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1
 
   if (!shifting && dragging) {
@@ -71,7 +71,8 @@ function onDocumentMouseUp(event) {
     var y1 = a.y < b.y ? a.y : b.y
     var y2 = a.y > b.y ? a.y : b.y
     var nodes = navigation[navigated].context == 'genome' ? graph.genome.nodes : graph.chromosomes.nodes
-    for (var i = 0; i < nodes.length; i++) {
+    var length = navigation[navigated].context == 'genome' ? chromosomes.length : graph.chromosomes.bins
+    for (var i = 0; i < length; i++) {
       var node = nodes[i]
       var nc = graph.context(node.px, node.py)
       if (nc.x > x1 && nc.x < x2 && nc.y > y1 && nc.y < y2) {
@@ -91,7 +92,7 @@ function onDocumentMouseUp(event) {
             .attr('y1', 70 + 0)
             .attr('y2', 70 + 10)
             .attr('class', 'active highlight chr' + node.chromosome + '-' + node.bin)
-          var ratio = 1 / (segments[0][1] - segments[0][0]) * ((width / 2) - 70)
+          var ratio = 1 / (segments[0][1] - segments[0][0]) * ((width * windowRatio) - 70)
           linear.svg.chromosomes[node.chromosome].append('line')
             .attr('stroke', rainbow(node.chromosome))
             .attr('x1', 15 + 20 + (node.bin - segments[node.chromosome][0]) * ratio)
@@ -164,7 +165,7 @@ function onDocumentKeyUp(event) {
         'link': 'and',
         'chromosomes': pin,
         'locus': locus,
-        'threshold': genomes.length * 20,
+        'threshold': 50,
       })
     } else if (navigation[navigated].context == 'chromosomes') {
       var pin = []

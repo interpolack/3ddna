@@ -4,13 +4,7 @@ html
     title 3DNA
     link(rel='stylesheet', href='/stylesheets/main.css')
     body
-      p Load 3D genome coordinates. File format:
-      div.code
-        | 0 <span>\t</span> chr1 3000000 <span>\t</span> -10.0000 <span>\t</span> 10.0000 <span>\t</span> 0.0000
-        | 1 <span>\t</span> chr1 4000000 <span>\t</span> 0.0000 <span>\t</span> -10.0000 <span>\t</span> 10.0000
-        | 2 <span>\t</span> chr1 5000000 <span>\t</span> 10.0000 <span>\t</span> 0.0000 <span>\t</span> -10.0000
-      br
-      br
+      p Load one or more 3D genomes for viewing and comparison:
       form(action='/load3D', method='post', enctype='multipart/form-data')
         | A&nbsp;&hercon;&nbsp;
         input(type='file', name='coordinatesA')
@@ -18,5 +12,22 @@ html
         | B&nbsp;&hercon;&nbsp;
         input(type='file', name='coordinatesB')
         br
+        | C&nbsp;&hercon;&nbsp;
+        input(type='file', name='coordinatesC')
+        br
+        | D&nbsp;&hercon;&nbsp;
+        input(type='file', name='coordinatesD')
+        br
         br
         input(type='submit', value='Load')
+      br
+      hr
+      p 3D coordinates file format:
+      div.code
+        | 0 <span>\t</span> chr1 3000000 <span>\t</span> -10.0000 <span>\t</span> 10.0000 <span>\t</span> 0.0000
+        | 1 <span>\t</span> chr1 4000000 <span>\t</span> 0.0000 <span>\t</span> -10.0000 <span>\t</span> 10.0000
+        | 2 <span>\t</span> chr1 5000000 <span>\t</span> 10.0000 <span>\t</span> 0.0000 <span>\t</span> -10.0000
+      br
+      p 2D contact map file format:
+      div.code
+        | 0

@@ -10,22 +10,25 @@ html
           #settings
             .set
               select#node
-                option(value='chromosome') chr centroid
+                option(value='chromosome') chromosome
                 option(value='1Mb') 1Mb bin
               span.icon &ocir;
             .set
               select#link
-                option(value='and') all < threshold    
+                option(value='and') centroid   
               span.icon &origof;
               br
               input#threshold(type='range' value=50 min=0 max=100 step=1)
         #unpin &Cross; &cirmid;&nbsp;
         #linear
         #graph
-          #navigation
-            .nav
-              span.icon &oast;
-              | genome
+          #main
+            div.title.main
+              | struct
+            #navigation
+              .nav
+                span.icon &oast;
+                | genome
       #genomes
         #model
           #wireframe

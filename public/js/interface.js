@@ -1,9 +1,8 @@
+'use strict'
+
 var rainbow = d3.scale.category20(),
 
     resolution = '1Mb',
-    cgSize = 300,
-    graphCap = 1000,
-    mapCap,
     threshold,
     build,
 
@@ -105,8 +104,16 @@ function loadPDB(resolution) {
         'bins': bins,
         'chromosomes': [],
       })
-      $('#genomes').prepend("<div class='genome'><svg class='graph' id='graph" + r + "'></svg></div>")
+      $('#genomes').append(
+        "<div class='genome'><div class='title'>STRUCT <b>" + alphabet[r]
+        + "</b><br><div class='info'>Type: Mouse Sim<br>Author: Noah</div></div><svg class='graph' id='graph"
+        + r + "'></svg></div>"
+      )
+      $('.main').append(" <b>" + alphabet[r] + "</b>")
+      if (r < results.length - 1) $('.main').append(" &and;")
     }
+
+    if (results.length > 1) $('#model').remove()
 
     for (var g = 0; g < genomes.length; g++) {
       var genome = genomes[g]
@@ -343,7 +350,7 @@ function modelGenome() {
     }
     bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
     bufferGeometry[i].attributes.color = new THREE.BufferAttribute(colors, 3)
-    material = new THREE.ShaderMaterial({
+    var material = new THREE.ShaderMaterial({
       vertexShader: document.getElementById('vertexShader').textContent,
       fragmentShader: document.getElementById('fragmentShader').textContent,
       vertexColors: THREE.VertexColors,
@@ -501,7 +508,6 @@ function graphGenome() {
 
   node = null
   nodeEnter = null
-  link = null
 
 }
 
@@ -521,7 +527,7 @@ function bakeForce(force, iterations) {
 function mapGraphs(nodes, links, keep) {
   for (var g = 0; g < genomes.length; g++) {
     var subgraph = d3.select('#graph' + g)
-    subgraph.selectAll('.link').remove()
+    subgraph.selectAll('.node,.link').remove()
     subgraph.selectAll('.link')
       .data(links)
       .enter()
@@ -537,6 +543,19 @@ function mapGraphs(nodes, links, keep) {
       .attr('stroke', function(d){ return d.physical >= 0 ? rainbow(d.physical) : '#fff' })
       .attr('opacity', function(d){ return d.physical >= 0 ? 1 : (threshold - d.distance[g]) / threshold / 10 })
       .attr('class', 'link')
+    subgraph.selectAll('.node')
+      .data(nodes)
+      .enter()
+      .append('circle')
+      .filter(function(d,i){
+        if (keep != null && keep.indexOf(i) < 0) return false
+        return true
+      })
+      .attr('r', 1.5)
+      .attr('cx', function(d){ return d.px / width / windowRatio * 200 })
+      .attr('cy', function(d){ return (d.py - height / 4) / width / windowRatio * 200 })
+      .attr('fill', function(d){ return rainbow(d.chromosome) })
+      .attr('class', 'node')
   }
 }
 
@@ -782,7 +801,6 @@ function graphChromosomes(chr) {
 
     node = null
     nodeEnter = null
-    link = null
 
   }
 }

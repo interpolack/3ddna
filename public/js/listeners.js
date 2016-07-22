@@ -1,3 +1,5 @@
+'use strict'
+
 function onWindowResize() {
   width = window.innerWidth
   height = window.innerHeight

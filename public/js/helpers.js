@@ -1,3 +1,5 @@
+'use strict'
+
 function alphaModelFromGraph(max) {
   var chr = graph.chromosomes.chr
   for (var i = 0; i < chr.length; i++) {

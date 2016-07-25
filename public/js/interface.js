@@ -12,7 +12,8 @@ var rainbow = d3.scale.category20(),
     initialWidth = window.innerWidth,
     height = window.innerHeight,
     initialHeight = window.innerHeight,
-    windowRatio = 0.4,
+    windowRatio = 0.3,
+    subWidth,
 
     all = [],
     genomes = [],
@@ -104,7 +105,7 @@ function loadPDB(resolution) {
         'bins': bins,
         'chromosomes': [],
       })
-      $('#genomes').append(
+      if (results.length > 1) $('#genomes').append(
         "<div class='genome'><div class='title'>STRUCT <b>" + alphabet[r]
         + "</b><br><div class='info'>Type: Mouse Sim<br>Author: Noah</div></div><svg class='graph' id='graph"
         + r + "'></svg></div>"
@@ -112,6 +113,11 @@ function loadPDB(resolution) {
       $('.main').append(" <b>" + alphabet[r] + "</b>")
       if (r < results.length - 1) $('.main').append(" &and;")
     }
+    subWidth = height / genomes.length
+    $('.genome').css('height', subWidth)
+    d3.selectAll('.graph')
+      .style('width', subWidth - 50)
+      .style('height', subWidth - 50)
 
     if (results.length > 1) $('#model').remove()
 
@@ -536,10 +542,10 @@ function mapGraphs(nodes, links, keep) {
         if (keep != null && keep.indexOf(d.source) < 0 && keep.indexOf(d.target) < 0) return false
         return d.physical >= 0 || d.distance[g] < threshold
       })
-      .attr('x1', function(d){ return nodes[d.source].px / width / windowRatio * 200 })
-      .attr('x2', function(d){ return nodes[d.target].px / width / windowRatio * 200 })
-      .attr('y1', function(d){ return (nodes[d.source].py - height / 4) / width / windowRatio * 200 })
-      .attr('y2', function(d){ return (nodes[d.target].py - height / 4) / width / windowRatio * 200 })
+      .attr('x1', function(d){ return nodes[d.source].px / width / windowRatio * (subWidth - 50) })
+      .attr('x2', function(d){ return nodes[d.target].px / width / windowRatio * (subWidth - 50) })
+      .attr('y1', function(d){ return (nodes[d.source].py - height / 4) / width / windowRatio * (subWidth - 50) })
+      .attr('y2', function(d){ return (nodes[d.target].py - height / 4) / width / windowRatio * (subWidth - 50) })
       .attr('stroke', function(d){ return d.physical >= 0 ? rainbow(d.physical) : '#fff' })
       .attr('opacity', function(d){ return d.physical >= 0 ? 1 : (threshold - d.distance[g]) / threshold / 10 })
       .attr('class', 'link')
@@ -552,8 +558,8 @@ function mapGraphs(nodes, links, keep) {
         return true
       })
       .attr('r', 1.5)
-      .attr('cx', function(d){ return d.px / width / windowRatio * 200 })
-      .attr('cy', function(d){ return (d.py - height / 4) / width / windowRatio * 200 })
+      .attr('cx', function(d){ return d.px / width / windowRatio * (subWidth - 50) })
+      .attr('cy', function(d){ return (d.py - height / 4) / width / windowRatio * (subWidth - 50) })
       .attr('fill', function(d){ return rainbow(d.chromosome) })
       .attr('class', 'node')
   }

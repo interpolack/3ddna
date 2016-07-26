@@ -134,6 +134,10 @@ html, body {
       position: relative;
       margin: 25px;
     }
+    .genome canvas {
+      position: relative;
+      margin: 25px;
+    }
     .title {
       position: absolute;
       color: #999;

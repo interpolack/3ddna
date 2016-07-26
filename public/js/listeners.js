@@ -5,17 +5,14 @@ function onWindowResize() {
   graph.svg.attr('width', width * windowRatio).attr('height', height)
   linear.svg.attr('width', width * windowRatio)
   linear.svg.line.attr('width', (width * windowRatio) - 50)
-  camera.aspect = width / (height - 250) * (1 - windowRatio)
-  camera.updateProjectionMatrix()
-  renderer.setSize(width * (1 - windowRatio), height - 250)
+  // camera.updateProjectionMatrix()
+  for (var g = 0; g < genomes.length; g++) renderers[g].setSize(subWidth - 50, subWidth - 50)
 }
 
-function onDocumentMouseMove(event) {
+function onDocumentMouseMove(event, g) {
   // event.preventDefault()
-  mouse.x = ((event.clientX - (width * windowRatio)) / renderer.domElement.clientWidth) * 2 - 1
-  mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1
 
-  if (!shifting && dragging) {
+  if (g == null && !shifting && dragging) {
     var a = {'x': click.x, 'y': click.y}
     var b = {'x': event.clientX, 'y': event.clientY}
     var x1 = a.x < b.x ? a.x : b.x
@@ -29,6 +26,11 @@ function onDocumentMouseMove(event) {
       .attr('height', y2 - y1)
   }
 
+  return // TODO
+
+  mouse.x = ((event.clientX - (width * windowRatio)) / renderers[g].domElement.clientWidth) * 2 - 1
+  mouse.y = -(event.clientY / renderers[g].domElement.clientHeight) * 2 + 1
+
   raycaster.setFromCamera(mouse, camera)
   var intersections = raycaster.intersectObjects(genome.children)
   var intersection = intersections.length > 0 ? intersections[0] : null
@@ -37,7 +39,7 @@ function onDocumentMouseMove(event) {
     if (pinned == 0 && navigation[navigated].context == 'chromosomes') {
       var chromosome = intersection.object.name
       var faceIndex = intersection.faceIndex
-      var total = bufferGeometry[chromosome].attributes.alpha.count
+      var total = geometries[0][chromosome].attributes.alpha.count // TODO 0 indexing only could be dangerous
       var bins = segments[chromosome][1] - segments[chromosome][0]
       var bin = parseInt(faceIndex / total * bins)
       alphaModel(0.2, navigation[navigated].chromosomes)
@@ -106,11 +108,13 @@ function onDocumentMouseUp(event) {
       }
     }
     if (navigation[navigated].context == 'genome') {
-      for (var i = 0; i < chromosomes.length; i++) {
-        var alphas = new Float32Array(bufferGeometry[i].attributes.alpha.count)
-        if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.8
-        else for (var a = 0; a < bufferGeometry[i].attributes.alpha.count; a++) alphas[a] = 0.2
-        bufferGeometry[i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+      for (var g = 0; g < genomes.length; g++) {
+        for (var i = 0; i < chromosomes.length; i++) {
+          var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
+          if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
+          else for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.2
+          geometries[g][i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+        }
       }
     } else if (navigation[navigated].context == 'chromosomes') {
       alphaModelFromGraph()
@@ -148,52 +152,60 @@ function onDocumentKeyUp(event) {
     search(val)
   } else if (pinned > 0) {
     if (navigation[navigated].context == 'genome') {
-      var pin = []
-      var locus
-      for (var i = 0; i < chromosomes.length; i++) {
-        if (chromosomes[i].pinned) {
-          pin.push(i)
-          var center = bufferGeometry[i].boundingSphere.center
-          locus = locus == null ? center : locus.add(center)
+      var loci = []
+      for (var g = 0; g < genomes.length; g++) {
+        var pin = []
+        var locus
+        for (var i = 0; i < chromosomes.length; i++) {
+          if (chromosomes[i].pinned) {
+            pin.push(i)
+            var center = geometries[g][i].boundingSphere.center
+            locus = locus == null ? center : locus.add(center)
+          }
         }
+        locus.divideScalar(pin.length)
+        loci.push(locus)
       }
-      locus.divideScalar(pin.length)
       $('#navigation').append("<div class='nav'><span class='icon'>&acd;</span> chromosome " + pin.map(function(c){ return chromosomeName(c) }).toString() + "</div>")
       navigation.push({
         'context': 'chromosomes',
         'node': '1Mb',
         'link': 'and',
         'chromosomes': pin,
-        'locus': locus,
+        'loci': loci,
         'threshold': 50,
         'index': navigation.length,
       })
     } else if (navigation[navigated].context == 'chromosomes') {
-      var pin = []
-      var nin = []
-      var locus
-      var nodes = graph.chromosomes.nodes
-      for (var i = 0; i < nodes.length; i++) {
-        var node = nodes[i]
-        if (!node.pinned) continue
-        var bin = all[node.bin]
-        pin.push(bin.bin)
-        nin.push(i)
-        var geometry = bufferGeometry[bin.chromosome]
-        var total = geometry.attributes.position.count
-        var segment = segments[bin.chromosome]
-        var bins = segment[1] - segment[0]
-        var size = parseInt(total / bins)
-        var target = (bin.bin - segment[0]) * size * 3
-        var center = new THREE.Vector3(
-          geometry.attributes.position.array[target],
-          geometry.attributes.position.array[target + 1],
-          geometry.attributes.position.array[target + 2]
-        )
-        locus = locus == null ? center : locus.add(center)
+      var loci = []
+      for (var g = 0; g < genomes.length; g++) {
+        var pin = []
+        var nin = []
+        var locus
+        var nodes = graph.chromosomes.nodes
+        for (var i = 0; i < nodes.length; i++) {
+          var node = nodes[i]
+          if (!node.pinned) continue
+          var bin = all[node.bin]
+          pin.push(bin.bin)
+          nin.push(i)
+          var geometry = geometries[g][bin.chromosome]
+          var total = geometry.attributes.position.count
+          var segment = segments[bin.chromosome]
+          var bins = segment[1] - segment[0]
+          var size = parseInt(total / bins)
+          var target = (bin.bin - segment[0]) * size * 3
+          var center = new THREE.Vector3(
+            geometry.attributes.position.array[target],
+            geometry.attributes.position.array[target + 1],
+            geometry.attributes.position.array[target + 2]
+          )
+          locus = locus == null ? center : locus.add(center)
+        }
+        locus.divideScalar(pin.length)
+        var string = pin.length == 1 ? pin[0] : pin[0] + "..." + pin[pin.length - 1]
+        loci.push(locus)
       }
-      locus.divideScalar(pin.length)
-      var string = pin.length == 1 ? pin[0] : pin[0] + "..." + pin[pin.length - 1]
       $('#navigation').append("<div class='nav'><span class='icon'>&there4;</span> bin " + string + "</div>")
       navigation.push({
         'context': 'bins',
@@ -202,36 +214,40 @@ function onDocumentKeyUp(event) {
         'chromosomes': navigation[navigated].chromosomes,
         'bins': pin,
         'nodes': nin,
-        'locus': locus,
+        'loci': loci,
         'threshold': 50,
         'root': navigation[navigated].index,
       })
     } else if (navigation[navigated].context == 'bins') {
-      var pin = []
-      var nin = []
-      var locus
-      var nodes = graph.chromosomes.nodes
-      for (var i = 0; i < nodes.length; i++) {
-        var node = nodes[i]
-        if (!node.pinned) continue
-        var bin = all[node.bin]
-        pin.push(bin.bin)
-        nin.push(i)
-        var geometry = bufferGeometry[bin.chromosome]
-        var total = geometry.attributes.position.count
-        var segment = segments[bin.chromosome]
-        var bins = segment[1] - segment[0]
-        var size = parseInt(total / bins)
-        var target = (bin.bin - segment[0]) * size * 3
-        var center = new THREE.Vector3(
-          geometry.attributes.position.array[target],
-          geometry.attributes.position.array[target + 1],
-          geometry.attributes.position.array[target + 2]
-        )
-        locus = locus == null ? center : locus.add(center)
+      var loci = []
+      for (var g = 0; g < genomes.length; g++) {
+        var pin = []
+        var nin = []
+        var locus
+        var nodes = graph.chromosomes.nodes
+        for (var i = 0; i < nodes.length; i++) {
+          var node = nodes[i]
+          if (!node.pinned) continue
+          var bin = all[node.bin]
+          pin.push(bin.bin)
+          nin.push(i)
+          var geometry = bufferGeometry[bin.chromosome]
+          var total = geometry.attributes.position.count
+          var segment = segments[bin.chromosome]
+          var bins = segment[1] - segment[0]
+          var size = parseInt(total / bins)
+          var target = (bin.bin - segment[0]) * size * 3
+          var center = new THREE.Vector3(
+            geometry.attributes.position.array[target],
+            geometry.attributes.position.array[target + 1],
+            geometry.attributes.position.array[target + 2]
+          )
+          locus = locus == null ? center : locus.add(center)
+        }
+        locus.divideScalar(pin.length)
+        var string = pin.length == 1 ? pin[0] : pin[0] + "..." + pin[pin.length - 1]
+        loci.push(locus)
       }
-      locus.divideScalar(pin.length)
-      var string = pin.length == 1 ? pin[0] : pin[0] + "..." + pin[pin.length - 1]
       $('#navigation').append("<div class='nav'><span class='icon'>&there4;</span> bin " + string + "</div>")
       navigation.push({
         'context': 'bins',
@@ -240,7 +256,7 @@ function onDocumentKeyUp(event) {
         'chromosomes': navigation[navigated].chromosomes,
         'bins': pin,
         'nodes': nin,
-        'locus': locus,
+        'loci': loci,
         'threshold': 50,
         'root': navigation[navigated].root,
       })

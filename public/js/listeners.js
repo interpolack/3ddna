@@ -189,10 +189,12 @@ function onDocumentKeyUp(event) {
         pin.push(bin.bin)
         nin.push(i)
       }
+      console.log(pin.length)
       var loci = []
       for (var g = 0; g < genomes.length; g++) {
         var locus = null
         for (var i = 0; i < nodes.length; i++) {
+          if (!nodes[i].pinned) continue
           var geometry = geometries[g][bin.chromosome]
           var total = geometry.attributes.position.count
           var segment = segments[bin.chromosome]
@@ -223,19 +225,22 @@ function onDocumentKeyUp(event) {
         'root': navigation[navigated].index,
       })
     } else if (navigation[navigated].context == 'bins') {
+      var pin = []
+      var nin = []
+      var nodes = graph.chromosomes.nodes
+      for (var i = 0; i < nodes.length; i++) {
+        var node = nodes[i]
+        if (!node.pinned) continue
+        var bin = all[node.bin]
+        pin.push(bin.bin)
+        nin.push(i)
+      }
       var loci = []
       for (var g = 0; g < genomes.length; g++) {
-        var pin = []
-        var nin = []
-        var locus
-        var nodes = graph.chromosomes.nodes
+        var locus = null
         for (var i = 0; i < nodes.length; i++) {
-          var node = nodes[i]
-          if (!node.pinned) continue
-          var bin = all[node.bin]
-          pin.push(bin.bin)
-          nin.push(i)
-          var geometry = bufferGeometry[bin.chromosome]
+          if (!nodes[i].pinned) continue
+          var geometry = geometries[g][bin.chromosome]
           var total = geometry.attributes.position.count
           var segment = segments[bin.chromosome]
           var bins = segment[1] - segment[0]

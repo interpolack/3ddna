@@ -596,11 +596,17 @@ function mapGraphs(nodes, links, keep) {
     var tiles = []
     var selector = nodes[0].bin == null ? 'chromosome' : 'bin'
     var elements = genomes[g][selector + 's']
-    for (var i = 0; i < nodes.length; i++) {
-      if (keep != null && keep.indexOf(i) == -1) continue
-      for (var j = 0; j < nodes.length; j++) {
-        if (keep != null && keep.indexOf(j) == -1) continue
-        tiles.push({'chromosome': nodes[i].chromosome, 'i': i, 'j': j, 'distance': distanceToSquared(elements[nodes[i][selector]].x, elements[nodes[i][selector]].y, elements[nodes[i][selector]].z, elements[nodes[j][selector]].x, elements[nodes[j][selector]].y, elements[nodes[j][selector]].z) })
+    if (keep == null) {
+      for (var i = 0; i < nodes.length; i++) {
+        for (var j = 0; j < nodes.length; j++) {
+          tiles.push({'chromosome': nodes[i].chromosome, 'i': i, 'j': j, 'distance': distanceToSquared(elements[nodes[i][selector]].x, elements[nodes[i][selector]].y, elements[nodes[i][selector]].z, elements[nodes[j][selector]].x, elements[nodes[j][selector]].y, elements[nodes[j][selector]].z) })
+        }
+      }
+    } else {
+      for (var i = 0; i < keep.length; i++) {
+        for (var j = 0; j < keep.length; j++) {
+          tiles.push({'chromosome': nodes[keep[i]].chromosome, 'i': i, 'j': j, 'distance': distanceToSquared(elements[nodes[keep[i]][selector]].x, elements[nodes[keep[i]][selector]].y, elements[nodes[keep[i]][selector]].z, elements[nodes[keep[j]][selector]].x, elements[nodes[keep[j]][selector]].y, elements[nodes[keep[j]][selector]].z) })
+        }
       }
     }
     var size = keep == null ? (subWidth - 100) / nodes.length : (subWidth - 100) / keep.length

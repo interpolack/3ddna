@@ -472,11 +472,12 @@ function graphGenome() {
     .attr('y', 3)
     .attr('text-anchor', 'middle')
     .attr('font-weight', 700)
-  nodeEnter.on('mouseover', function(d){
-    if (pinned == 0) d3.selectAll('.chromosome').attr('opacity', 0.2)
-    else d3.selectAll('.chromosome').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+  nodeEnter.on('mouseover', function(d,index){
+    if (pinned == 0) d3.selectAll('.node').attr('opacity', 0.2)
+    else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
     d3.select(this).attr('opacity', 1)
     for (var g = 0; g < genomes.length; g++) {
+      d3.select(d3.select('#graph' + g).selectAll('.node')[0][index]).attr('opacity', 1)
       for (var i = 0; i < segments.length; i++) {
         var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
         if (i == d.chromosome || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
@@ -494,8 +495,8 @@ function graphGenome() {
       .attr('class', 'active highlight chr' + d.chromosome + '-all')
   })
   nodeEnter.on('mouseout', function(d){
-    if (pinned == 0) d3.selectAll('.chromosome').attr('opacity', 1)
-    else d3.selectAll('.chromosome').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+    if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
+    else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
     for (var g = 0; g < genomes.length; g++) {
       for (var i = 0; i < segments.length; i++) {
         var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
@@ -598,21 +599,27 @@ function mapGraphs(nodes, links, keep) {
     for (var i = 0; i < nodes.length; i++) {
       if (keep != null && keep.indexOf(i) == -1) continue
       for (var j = 0; j < nodes.length; j++) {
-        if (i == j) continue
         if (keep != null && keep.indexOf(j) == -1) continue
-        tiles.push({'i': i, 'j': j, 'distance': distanceToSquared(elements[nodes[i][selector]].x, elements[nodes[i][selector]].y, elements[nodes[i][selector]].z, elements[nodes[j][selector]].x, elements[nodes[j][selector]].y, elements[nodes[j][selector]].z) })
+        tiles.push({'chromosome': nodes[i].chromosome, 'i': i, 'j': j, 'distance': distanceToSquared(elements[nodes[i][selector]].x, elements[nodes[i][selector]].y, elements[nodes[i][selector]].z, elements[nodes[j][selector]].x, elements[nodes[j][selector]].y, elements[nodes[j][selector]].z) })
       }
     }
-    var size = keep == null ? subWidth / nodes.length : subWidth / keep.length
+    var size = keep == null ? (subWidth - 100) / nodes.length : (subWidth - 100) / keep.length
     submatrix.selectAll('.tile')
       .data(tiles)
       .enter()
       .append('rect')
       .attr('width', size)
       .attr('height', size)
-      .attr('x', function(d){ return size * d.i })
-      .attr('y', function(d){ return size * d.j })
-      .attr('fill', function(d){ return d3.rgb(200 - d.distance, 200 - d.distance, 200 - d.distance) })
+      .attr('x', function(d){ return 25 + size * d.i })
+      .attr('y', function(d){ return 25 + size * d.j })
+      .attr('fill', function(d){
+        var color = d3.rgb(rainbow(d.chromosome))
+        if (d.distance == 0) return color
+        color.r = parseInt(color.r / d.distance * 10 + 1)
+        color.g = parseInt(color.g / d.distance * 10 + 1)
+        color.b = parseInt(color.b / d.distance * 10 + 1)
+        return color
+      })
       .attr('class', 'tile')
   }
 }

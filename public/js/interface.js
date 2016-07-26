@@ -109,15 +109,19 @@ function loadPDB(resolution) {
       $('#genomes').append(
         "<div class='genome' id='genome" + r + "'><div class='title'>STRUCT <b>" + alphabet[r]
         + "</b><br><div class='info'>Type: Mouse Sim<br>Author: Noah</div></div><svg class='graph' id='graph"
-        + r + "'></svg></div>"
+        + r + "'></svg><div class='model' id='model"
+        + r + "'></div><svg class='matrix' id='matrix"
+        + r + "'></svg</div>"
       )
       $('.main').append(" <b>" + alphabet[r] + "</b>")
       if (r < results.length - 1) $('.main').append(" &and;")
     }
     subWidth = height / genomes.length
-    $('.genome').css('height', subWidth)
+    $('.genome')
+      .css('height', subWidth)
+      .css('width', subWidth * 3)
     if (genomes.length == 1) d3.selectAll('.graph').remove()
-    else d3.selectAll('.graph')
+    else d3.selectAll('.graph,.matrix')
       .style('width', subWidth - 50)
       .style('height', subWidth - 50)
 
@@ -181,7 +185,7 @@ function init() {
     renderers[g] = new THREE.WebGLRenderer({ alpha: true })
     renderers[g].setSize(subWidth - 50, subWidth - 50)
     renderers[g].setClearColor(0x000000, 0)
-    $('#genome' + g).append(renderers[g].domElement)
+    $('#genome' + g + ' .model').append(renderers[g].domElement)
     controls[g] = new THREE.TrackballControls(cameras[g], renderers[g].domElement)
     sphere = new THREE.Mesh(new THREE.SphereGeometry(11.5, 30, 30), new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.1 }))
     sphere.visible = false
@@ -546,8 +550,15 @@ function bakeForce(force, iterations) {
     .attr('y2', function(d){ return d.target.y })
 }
 
+/* update the comparison rows:
+/ nodes: nodes (bins or chromosomes) from the lefthand side
+/ links: links from each of these nodes to all others
+/ keep: if not null, do not consider any nodes outside of this array
+*/
 function mapGraphs(nodes, links, keep) {
+  var r = nodes[0].bin == null ? 3 : 2
   for (var g = 0; g < genomes.length; g++) {
+    // update the graphs in each comparison row:
     var subgraph = d3.select('#graph' + g)
     subgraph.selectAll('.node,.link').remove()
     subgraph.selectAll('.link')
@@ -573,11 +584,36 @@ function mapGraphs(nodes, links, keep) {
         if (keep != null && keep.indexOf(i) < 0) return false
         return true
       })
-      .attr('r', 1.5)
+      .attr('r', r)
       .attr('cx', function(d){ return d.px / width / windowRatio * (subWidth - 50) })
       .attr('cy', function(d){ return (d.py - height / 4) / width / windowRatio * (subWidth - 50) })
       .attr('fill', function(d){ return rainbow(d.chromosome) })
       .attr('class', 'node')
+    // update the matrices in each comparison row:
+    var submatrix = d3.select('#matrix' + g)
+    submatrix.selectAll('.tile').remove()
+    var tiles = []
+    var selector = nodes[0].bin == null ? 'chromosome' : 'bin'
+    var elements = genomes[g][selector + 's']
+    for (var i = 0; i < nodes.length; i++) {
+      if (keep != null && keep.indexOf(i) == -1) continue
+      for (var j = 0; j < nodes.length; j++) {
+        if (i == j) continue
+        if (keep != null && keep.indexOf(j) == -1) continue
+        tiles.push({'i': i, 'j': j, 'distance': distanceToSquared(elements[nodes[i][selector]].x, elements[nodes[i][selector]].y, elements[nodes[i][selector]].z, elements[nodes[j][selector]].x, elements[nodes[j][selector]].y, elements[nodes[j][selector]].z) })
+      }
+    }
+    var size = keep == null ? subWidth / nodes.length : subWidth / keep.length
+    submatrix.selectAll('.tile')
+      .data(tiles)
+      .enter()
+      .append('rect')
+      .attr('width', size)
+      .attr('height', size)
+      .attr('x', function(d){ return size * d.i })
+      .attr('y', function(d){ return size * d.j })
+      .attr('fill', function(d){ return d3.rgb(200 - d.distance, 200 - d.distance, 200 - d.distance) })
+      .attr('class', 'tile')
   }
 }
 

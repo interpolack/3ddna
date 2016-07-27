@@ -9,7 +9,7 @@ function drawCrosshair(g, index, center) {
     .attr('x1', push + index * submatrix.attr('size'))
     .attr('y1', 25)
     .attr('x2', push + index * submatrix.attr('size'))
-    .attr('y2', 244)
+    .attr('y2', subWidth - 75)
     .attr('class', 'crosshair')
   submatrix
     .append('line')
@@ -17,7 +17,7 @@ function drawCrosshair(g, index, center) {
     .attr('y1', push + index * submatrix.attr('size'))
     .attr('x1', push)
     .attr('y2', push + index * submatrix.attr('size'))
-    .attr('x2', 244)
+    .attr('x2', subWidth - 75)
     .attr('class', 'crosshair')
 }
 

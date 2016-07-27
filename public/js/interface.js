@@ -260,7 +260,8 @@ function navigate(nav) {
   for (var g = 0; g < genomes.length; g++) {
     controls[g].target.copy(navigation[nav].loci[g])
     cameras[g].position.copy(navigation[nav].loci[g])
-    cameras[g].position.setZ(20)
+    if (navigation[nav].context == 'genome') cameras[g].position.set(11, 11, 11)
+    else cameras[g].position.copy(navigation[nav].loci[g].sub(new THREE.Vector3(8, 8, 8)))
   }
   graph.container.attr('transform', 'scale(1)')
 
@@ -383,7 +384,7 @@ function modelGenome() {
       models[g].add(meshes[g][i])
     }
     scenes[g].add(models[g])
-    cameras[g].position.z = resolution == '1Mb' ? 20 : 40
+    cameras[g].position.set(11, 11, 11)
   }
 
 }
@@ -589,6 +590,8 @@ function mapGraphs(nodes, links, keep) {
     // update the graphs in each comparison row:
     var subgraph = d3.select('#graph' + g)
     subgraph.selectAll('.node,.link').remove()
+    var size = subWidth - 50
+    var zoom = 1.5
     subgraph.selectAll('.link')
       .data(links)
       .enter()
@@ -597,10 +600,10 @@ function mapGraphs(nodes, links, keep) {
         if (keep != null && keep.indexOf(d.source) < 0 && keep.indexOf(d.target) < 0) return false
         return d.physical >= 0 || d.distance[g] < threshold
       })
-      .attr('x1', function(d){ return nodes[d.source].px / width / windowRatio * (subWidth - 50) })
-      .attr('x2', function(d){ return nodes[d.target].px / width / windowRatio * (subWidth - 50) })
-      .attr('y1', function(d){ return (nodes[d.source].py - height / 4) / width / windowRatio * (subWidth - 50) })
-      .attr('y2', function(d){ return (nodes[d.target].py - height / 4) / width / windowRatio * (subWidth - 50) })
+      .attr('x1', function(d){ return ((nodes[d.source].x / width / windowRatio * (size * 0.5) + (size * 0.25)) - (size / 2)) * zoom + (size / 2)  })
+      .attr('x2', function(d){ return ((nodes[d.target].x / width / windowRatio * (size * 0.5) + (size * 0.25)) - (size / 2)) * zoom + (size / 2)  })
+      .attr('y1', function(d){ return (((nodes[d.source].y - height / 2) / width / windowRatio * (size * 0.5) + (size / 2)) - (size / 2)) * zoom + (size / 2) })
+      .attr('y2', function(d){ return (((nodes[d.target].y - height / 2) / width / windowRatio * (size * 0.5) + (size / 2)) - (size / 2)) * zoom + (size / 2) })
       .attr('stroke', function(d){ return d.physical >= 0 ? rainbow(d.physical) : '#fff' })
       .attr('opacity', function(d){ return d.physical >= 0 ? 0.5 : (threshold - d.distance[g]) / threshold / 10 })
       .attr('class', 'link')
@@ -613,8 +616,8 @@ function mapGraphs(nodes, links, keep) {
         return true
       })
       .attr('r', r)
-      .attr('cx', function(d){ return d.px / width / windowRatio * (subWidth - 50) })
-      .attr('cy', function(d){ return (d.py - height / 4) / width / windowRatio * (subWidth - 50) })
+      .attr('cx', function(d){ return ((d.x / width / windowRatio * (size * 0.5) + (size * 0.25)) - (size / 2)) * zoom + (size / 2) })
+      .attr('cy', function(d){ return (((d.y - height / 2) / width / windowRatio * (size * 0.5) + (size / 2)) - (size / 2)) * zoom + (size / 2) })
       .attr('fill', function(d){ return rainbow(d.chromosome) })
       .attr('class', function(d){ return 'node' + ' node' + d[selector] })
     // update the matrices in each comparison row:

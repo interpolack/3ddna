@@ -436,6 +436,30 @@ function linkGenome(nodes) {
     .attr('stroke', '#555')
     .attr('opacity', 1)
     .attr('class', 'link interchromosomal')
+    .on('mouseover', function(d){
+      for (var g = 0; g < genomes.length; g++) {
+        var submatrix = d3.select('#matrix' + g)
+        submatrix.append('rect')
+          .attr('fill', 'none')
+          .attr('stroke', '#fff')
+          .attr('class', 'highlight')
+          .attr('width', submatrix.attr('size'))
+          .attr('height', submatrix.attr('size'))
+          .attr('x', 25 + d.source.chromosome * submatrix.attr('size'))
+          .attr('y', 25 + d.target.chromosome * submatrix.attr('size'))
+        submatrix.append('rect')
+          .attr('fill', 'none')
+          .attr('stroke', '#fff')
+          .attr('class', 'highlight')
+          .attr('width', submatrix.attr('size'))
+          .attr('height', submatrix.attr('size'))
+          .attr('x', 25 + d.target.chromosome * submatrix.attr('size'))
+          .attr('y', 25 + d.source.chromosome * submatrix.attr('size'))
+      }
+    })
+    .on('mouseout', function(d){
+      d3.selectAll('.highlight').remove()
+    })
 
   return [nodes, links, others]
 }
@@ -476,8 +500,9 @@ function graphGenome() {
     if (pinned == 0) d3.selectAll('.node').attr('opacity', 0.2)
     else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
     d3.select(this).attr('opacity', 1)
+    d3.selectAll('.node' + d.chromosome).attr('opacity', 1)
     for (var g = 0; g < genomes.length; g++) {
-      d3.select(d3.select('#graph' + g).selectAll('.node')[0][index]).attr('opacity', 1)
+      drawCrosshair(g, index, true)
       for (var i = 0; i < segments.length; i++) {
         var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
         if (i == d.chromosome || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
@@ -495,8 +520,9 @@ function graphGenome() {
       .attr('class', 'active highlight chr' + d.chromosome + '-all')
   })
   nodeEnter.on('mouseout', function(d){
-    if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
+    if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', 1)
     else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+    d3.selectAll('.crosshair').remove()
     for (var g = 0; g < genomes.length; g++) {
       for (var i = 0; i < segments.length; i++) {
         var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
@@ -558,6 +584,7 @@ function bakeForce(force, iterations) {
 */
 function mapGraphs(nodes, links, keep) {
   var r = nodes[0].bin == null ? 3 : 2
+  var selector = nodes[0].bin == null ? 'chromosome' : 'bin'
   for (var g = 0; g < genomes.length; g++) {
     // update the graphs in each comparison row:
     var subgraph = d3.select('#graph' + g)
@@ -575,7 +602,7 @@ function mapGraphs(nodes, links, keep) {
       .attr('y1', function(d){ return (nodes[d.source].py - height / 4) / width / windowRatio * (subWidth - 50) })
       .attr('y2', function(d){ return (nodes[d.target].py - height / 4) / width / windowRatio * (subWidth - 50) })
       .attr('stroke', function(d){ return d.physical >= 0 ? rainbow(d.physical) : '#fff' })
-      .attr('opacity', function(d){ return d.physical >= 0 ? 1 : (threshold - d.distance[g]) / threshold / 10 })
+      .attr('opacity', function(d){ return d.physical >= 0 ? 0.5 : (threshold - d.distance[g]) / threshold / 10 })
       .attr('class', 'link')
     subgraph.selectAll('.node')
       .data(nodes)
@@ -589,12 +616,11 @@ function mapGraphs(nodes, links, keep) {
       .attr('cx', function(d){ return d.px / width / windowRatio * (subWidth - 50) })
       .attr('cy', function(d){ return (d.py - height / 4) / width / windowRatio * (subWidth - 50) })
       .attr('fill', function(d){ return rainbow(d.chromosome) })
-      .attr('class', 'node')
+      .attr('class', function(d){ return 'node' + ' node' + d[selector] })
     // update the matrices in each comparison row:
     var submatrix = d3.select('#matrix' + g)
     submatrix.selectAll('.tile').remove()
     var tiles = []
-    var selector = nodes[0].bin == null ? 'chromosome' : 'bin'
     var elements = genomes[g][selector + 's']
     if (keep == null) {
       for (var i = 0; i < nodes.length; i++) {
@@ -610,6 +636,7 @@ function mapGraphs(nodes, links, keep) {
       }
     }
     var size = keep == null ? (subWidth - 100) / nodes.length : (subWidth - 100) / keep.length
+    submatrix.attr('size', size)
     submatrix.selectAll('.tile')
       .data(tiles)
       .enter()
@@ -729,11 +756,30 @@ function graphChromosomes(chr) {
     .attr('stroke', '#333')
     .attr('stroke-width', 2)
     .attr('fill', function(d){ return rainbow(d.chromosome) })
-  nodeEnter.on('mouseover', function(d){
+  nodeEnter.on('mouseover', function(d, index){
     if (pinned == 0) d3.selectAll('.node').attr('opacity', 0.2)
     else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
-    d3.select(this).attr('opacity', 1)
+    d3.selectAll('.node' + d.bin).attr('opacity', 1)
+    var element = d3.select(this)
+    element.attr('opacity', 1)
+    element.append('text')
+      .text("1M")
+      .attr('fill', function(d){ return rainbow(d.chromosome) })
+      .attr('y', -8)
+      .attr('x', 4)
+      .attr('pointer-events', 'none')
+      .attr('class', 'tooltip')
+    element.append('text')
+      .text(function(d){ return d.bin - segments[d.chromosome][0] })
+      .attr('fill', '#fff')
+      .attr('x', 4)
+      .attr('pointer-events', 'none')
+      .attr('class', 'tooltip')
+    // d3.selectAll('.tile').filter(function(o){
+    //   return o.i != d.bin && o.j != d.bin
+    // }).attr('opacity', 0.2)
     for (var g = 0; g < genomes.length; g++) {
+      drawCrosshair(g, index)
       for (var i = 0; i < chr.length; i++) {
         var segment = segments[chr[i]]
         var geometry = geometries[g][chr[i]]
@@ -769,6 +815,8 @@ function graphChromosomes(chr) {
   nodeEnter.on('mouseout', function(d){
     if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
     else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+    d3.select(this).selectAll('.tooltip').remove()
+    d3.selectAll('.crosshair').remove()
     for (var g = 0; g < genomes.length; g++) {
       for (var i = 0; i < chr.length; i++) {
         var segment = segments[chr[i]]

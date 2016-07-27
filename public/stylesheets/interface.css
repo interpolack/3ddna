@@ -159,9 +159,6 @@ html, body {
 #left .node {
   cursor: pointer;
 }
-#left .link {
-  cursor: pointer;
-}
 #linear {
   position: absolute;
   width: 100%;

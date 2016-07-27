@@ -1,5 +1,26 @@
 'use strict'
 
+function drawCrosshair(g, index, center) {
+  var submatrix = d3.select('#matrix' + g)
+  var push = center ? 25 + submatrix.attr('size') / 2 : 25
+  submatrix
+    .append('line')
+    .attr('stroke', '#fff')
+    .attr('x1', push + index * submatrix.attr('size'))
+    .attr('y1', 25)
+    .attr('x2', push + index * submatrix.attr('size'))
+    .attr('y2', 244)
+    .attr('class', 'crosshair')
+  submatrix
+    .append('line')
+    .attr('stroke', '#fff')
+    .attr('y1', push + index * submatrix.attr('size'))
+    .attr('x1', push)
+    .attr('y2', push + index * submatrix.attr('size'))
+    .attr('x2', 244)
+    .attr('class', 'crosshair')
+}
+
 function alphaModelFromGraph(max) {
   var chr = graph.chromosomes.chr
   for (var g = 0; g < genomes.length; g++) {

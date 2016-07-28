@@ -74,6 +74,7 @@ function onDocumentMouseUp(event) {
     var y2 = a.y > b.y ? a.y : b.y
     var nodes = navigation[navigated].context == 'genome' ? graph.genome.nodes : graph.chromosomes.nodes
     var length = navigation[navigated].context == 'genome' ? chromosomes.length : graph.chromosomes.bins
+    var pins = []
     for (var i = 0; i < length; i++) {
       var node = nodes[i]
       var nc = graph.context(node.px, node.py)
@@ -104,9 +105,17 @@ function onDocumentMouseUp(event) {
             .attr('class', 'active highlight chr' + node.chromosome + '-' + node.bin)
         }
         chromosomes[node.chromosome].pinned = node.pinned = true
+        pins.push(i)
         pinned++
       }
     }
+    d3.selectAll('.tile')
+      .filter(function(d){
+        return pins.indexOf(d.i) >= 0 || pins.indexOf(d.j) >= 0
+      }).datum(function(d){
+        d.pinned = true
+        return d
+      })
     if (navigation[navigated].context == 'genome') {
       for (var g = 0; g < genomes.length; g++) {
         for (var i = 0; i < chromosomes.length; i++) {
@@ -119,7 +128,7 @@ function onDocumentMouseUp(event) {
     } else if (navigation[navigated].context == 'chromosomes') {
       alphaModelFromGraph()
     }
-    if (pinned != 0) d3.selectAll('.node').attr('opacity', function(d){ return d.pinned ? 1 : 0.2 })
+    if (pinned != 0) d3.selectAll('.node,.tile').attr('opacity', function(d){ return d.pinned ? 1 : 0.2 })
     graph.marquee.remove()
     $('#unpin').css('visibility', pinned == 0 ? 'hidden' : 'visible')
   }

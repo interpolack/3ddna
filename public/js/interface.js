@@ -18,6 +18,7 @@ var rainbow = d3.scale.category20(),
     all = [],
     external = null,
     loaded = [],
+    coloring = 'chromosome',
     genomes = [],
     pdb = [],
     segments = [],
@@ -261,8 +262,13 @@ function init() {
     if (navigation[navigated].context == 'bins') navigate(navigation[navigated].root)
     var nodes = navigation[navigated].context == 'genome' ? graph.genome.nodes : graph.chromosomes.nodes
     for (var i = 0; i < nodes.length; i++) chromosomes[nodes[i].chromosome].pinned = nodes[i].pinned = false
+    d3.selectAll('.node,.tile')
+      .datum(function(d){
+        d.pinned = false
+        return d
+      })
     pinned = 0
-    d3.selectAll('.node').attr('opacity', 1)
+    d3.selectAll('.node,.tile').attr('opacity', 1)
     linear.svg.selectAll('.active').filter('.highlight').remove()
     alphaModel(0.8, navigation[navigated].chromosomes)
     $(this).css('visibility', 'hidden')
@@ -291,12 +297,33 @@ function init() {
 
   $('#data').on('change', function(event) {
     var value = event.target.value
+    var colors = []
     if (value == "chromosome") {
-      d3.selectAll('.node').attr('stroke', function(d){ return d.pinned ? 1 : 0.2 })
+      d3.selectAll('.node').select('circle')
+        .attr('fill', function(d){
+          var color = rainbow(d.chromosome)
+          colors.push(color)
+          return color
+        })
     } else {
       value = parseInt(value)
-      d3.selectAll('.node').attr('opacity', function(d,i){ return atLeast((external[d.bin][value] - loaded[value][1]) / loaded[value][2], 0.2) })
+      if (loaded[value][1] == 0.0 && loaded[value][2] == 1.0) d3.selectAll('.node').select('circle')
+        .attr('fill', function(d,i){
+          var color = external[d.bin][value] ? '#1cf278' : '#f21c5c'
+          colors.push(color)
+          return color
+        })
+      else d3.selectAll('.node').select('circle')
+        .attr('fill', function(d,i){
+          var r = 255 - 255 * (external[d.bin][value] - loaded[value][1]) / loaded[value][2]
+          var b = 255 * (external[d.bin][value] - loaded[value][1]) / loaded[value][2]
+          var color = d3.rgb(r, 50, b)
+          colors.push(color)
+          return color
+        })
     }
+    coloring = value
+    colorGraphs(colors, navigation[navigated].chromosomes)
   })
 
   animate()
@@ -491,30 +518,6 @@ function linkGenome(nodes) {
     .attr('stroke', '#555')
     .attr('opacity', 1)
     .attr('class', 'link interchromosomal')
-    .on('mouseover', function(d){
-      for (var g = 0; g < genomes.length; g++) {
-        var submatrix = d3.select('#matrix' + g)
-        submatrix.append('rect')
-          .attr('fill', 'none')
-          .attr('stroke', '#fff')
-          .attr('class', 'highlight')
-          .attr('width', submatrix.attr('size'))
-          .attr('height', submatrix.attr('size'))
-          .attr('x', 25 + d.source.chromosome * submatrix.attr('size'))
-          .attr('y', 25 + d.target.chromosome * submatrix.attr('size'))
-        submatrix.append('rect')
-          .attr('fill', 'none')
-          .attr('stroke', '#fff')
-          .attr('class', 'highlight')
-          .attr('width', submatrix.attr('size'))
-          .attr('height', submatrix.attr('size'))
-          .attr('x', 25 + d.target.chromosome * submatrix.attr('size'))
-          .attr('y', 25 + d.source.chromosome * submatrix.attr('size'))
-      }
-    })
-    .on('mouseout', function(d){
-      d3.selectAll('.highlight').remove()
-    })
 
   return [nodes, links, others]
 }
@@ -552,12 +555,11 @@ function graphGenome() {
     .attr('text-anchor', 'middle')
     .attr('font-weight', 700)
   nodeEnter.on('mouseover', function(d,index){
-    if (pinned == 0) d3.selectAll('.node').attr('opacity', 0.2)
-    else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+    if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', function(d){ return d.i == index || d.j == index ? 1 : 0.2 })
+    else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned || d.i == index || d.j == index ? 1 : 0.2 })
     d3.select(this).attr('opacity', 1)
     d3.selectAll('.node' + d.chromosome).attr('opacity', 1)
     for (var g = 0; g < genomes.length; g++) {
-      drawCrosshair(g, index, true)
       for (var i = 0; i < segments.length; i++) {
         var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
         if (i == d.chromosome || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
@@ -576,8 +578,7 @@ function graphGenome() {
   })
   nodeEnter.on('mouseout', function(d){
     if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', 1)
-    else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
-    d3.selectAll('.crosshair').remove()
+    else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
     for (var g = 0; g < genomes.length; g++) {
       for (var i = 0; i < segments.length; i++) {
         var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
@@ -589,6 +590,13 @@ function graphGenome() {
     linear.svg.selectAll('.chr' + d.chromosome + '-all').filter(function(o){ return !d3.select(this).classed('pinned') }).remove()
   })
   nodeEnter.on('click', function(d){
+    d3.selectAll('.tile')
+      .filter(function(o){
+        return d3.select(this).attr('opacity') == 1
+      }).datum(function(o){
+        o.pinned = !d.pinned
+        return o
+      })
     d.pinned = !d.pinned
     if (d.pinned) pinned++
     else pinned--
@@ -619,6 +627,10 @@ function graphGenome() {
 
 }
 
+/* compute force-layout graph before rendering it:
+force: the d3.layout.force() instance
+iterations: number of iterations to run forces
+*/
 function bakeForce(force, iterations) {
   force.start()
   for (var i = 0; i < iterations; i++) force.tick()
@@ -630,6 +642,39 @@ function bakeForce(force, iterations) {
     .attr('y1', function(d){ return d.source.y })
     .attr('x2', function(d){ return d.target.x })
     .attr('y2', function(d){ return d.target.y })
+}
+
+/* color the comparison rows:
+colors: array of colors for each bin
+chr: array of chromosomes to include
+*/
+function colorGraphs(colors, chr) {
+  for (var g = 0; g < genomes.length; g++) {
+    // color the graphs:
+    var subgraph = d3.select('#graph' + g)
+    subgraph.selectAll('.node')
+      .attr('fill', function(d,i){ return colors[i] })
+    // color the matrices:
+    var submatrix = d3.select('#matrix' + g)
+    submatrix.selectAll('.tile')
+      .attr('fill', function(d,i){ return colors[d.i] })
+    // color the models:
+    for (var j = 0; j < chr.length; j++) {
+      var i = chr[j]
+      var total = geometries[g][i].attributes.position.count
+      var bins = segments[i][1] - segments[i][0]
+      var size = parseInt(total / bins)
+      for (var bin = 0; bin < colors.length; bin++) {
+        var color = d3.rgb(colors[bin])
+        for (var v = bin * size; v < (bin + 1) * size; v++) {
+          geometries[g][i].attributes.color.array[(v * 3)] = color.r / 255
+          geometries[g][i].attributes.color.array[(v * 3) + 1] = color.g / 255
+          geometries[g][i].attributes.color.array[(v * 3) + 2] = color.b / 255
+        }
+      }
+      geometries[g][i].attributes.color.needsUpdate = true
+    }
+  }
 }
 
 /* update the comparison rows:
@@ -698,6 +743,9 @@ function mapGraphs(nodes, links, keep) {
       .data(tiles)
       .enter()
       .append('rect')
+      .filter(function(d){
+        return d.distance < threshold / genomes.length
+      })
       .attr('width', size)
       .attr('height', size)
       .attr('x', function(d){ return 25 + size * d.i })
@@ -705,9 +753,9 @@ function mapGraphs(nodes, links, keep) {
       .attr('fill', function(d){
         var color = d3.rgb(rainbow(d.chromosome))
         if (d.distance == 0) return color
-        color.r = parseInt(color.r / d.distance * 10 + 1)
-        color.g = parseInt(color.g / d.distance * 10 + 1)
-        color.b = parseInt(color.b / d.distance * 10 + 1)
+        color.r = parseInt(color.r / d.distance * 5 + 1)
+        color.g = parseInt(color.g / d.distance * 5 + 1)
+        color.b = parseInt(color.b / d.distance * 5 + 1)
         return color
       })
       .attr('class', 'tile')
@@ -814,29 +862,44 @@ function graphChromosomes(chr) {
     .attr('stroke-width', 2)
     .attr('fill', function(d){ return rainbow(d.chromosome) })
   nodeEnter.on('mouseover', function(d, index){
-    if (pinned == 0) d3.selectAll('.node').attr('opacity', 0.2)
-    else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+    if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.i == index || d.j == index ? 1 : 0.2 })
+    else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned || d.i == index || d.j == index ? 1 : 0.2 })
     d3.selectAll('.node' + d.bin).attr('opacity', 1)
     var element = d3.select(this)
     element.attr('opacity', 1)
     element.append('text')
-      .text("1M")
-      .attr('fill', function(d){ return rainbow(d.chromosome) })
+      .text("1Mb")
+      .attr('fill', '#bbb')
+      .attr('font-size', '8px')
       .attr('y', -8)
-      .attr('x', 4)
+      .attr('x', 16)
       .attr('pointer-events', 'none')
       .attr('class', 'tooltip')
     element.append('text')
       .text(function(d){ return d.bin - segments[d.chromosome][0] })
-      .attr('fill', '#fff')
-      .attr('x', 4)
+      .attr('fill', function(d){ return rainbow(d.chromosome) })
+      .attr('x', 16)
       .attr('pointer-events', 'none')
       .attr('class', 'tooltip')
-    // d3.selectAll('.tile').filter(function(o){
-    //   return o.i != d.bin && o.j != d.bin
-    // }).attr('opacity', 0.2)
+    var color = d3.select(this).select('circle').attr('fill')
+    if (coloring != 'chromosome') {
+      element.append('text')
+        .text(loaded[coloring][0])
+        .attr('fill', '#bbb')
+        .attr('font-size', '8px')
+        .attr('x', 16)
+        .attr('y', 10)
+        .attr('pointer-events', 'none')
+        .attr('class', 'tooltip')
+      element.append('text')
+        .text(external[d.bin][coloring])
+        .attr('fill', color)
+        .attr('x', 16)
+        .attr('y', 18)
+        .attr('pointer-events', 'none')
+        .attr('class', 'tooltip')
+    }
     for (var g = 0; g < genomes.length; g++) {
-      drawCrosshair(g, index)
       for (var i = 0; i < chr.length; i++) {
         var segment = segments[chr[i]]
         var geometry = geometries[g][chr[i]]
@@ -853,7 +916,7 @@ function graphChromosomes(chr) {
     }
     if (!d.pinned) {
       linear.svg.append('line')
-        .attr('stroke', rainbow(d.chromosome))
+        .attr('stroke', color)
         .attr('x1', 20 + d.bin * linear.ratio)
         .attr('x2', 20 + d.bin * linear.ratio)
         .attr('y1', 70 + 0)
@@ -861,7 +924,7 @@ function graphChromosomes(chr) {
         .attr('class', 'active highlight chr' + d.chromosome + '-' + d.bin)
       var ratio = 1 / (segments[0][1] - segments[0][0]) * ((width * windowRatio) - 70)
       linear.svg.chromosomes[d.chromosome].append('line')
-        .attr('stroke', rainbow(d.chromosome))
+        .attr('stroke', color)
         .attr('x1', 15 + 20 + (d.bin - segments[d.chromosome][0]) * ratio)
         .attr('x2', 15 + 20 + (d.bin - segments[d.chromosome][0]) * ratio)
         .attr('y1', 0)
@@ -870,10 +933,9 @@ function graphChromosomes(chr) {
     }
   })
   nodeEnter.on('mouseout', function(d){
-    if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
-    else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+    if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', 1)
+    else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
     d3.select(this).selectAll('.tooltip').remove()
-    d3.selectAll('.crosshair').remove()
     for (var g = 0; g < genomes.length; g++) {
       for (var i = 0; i < chr.length; i++) {
         var segment = segments[chr[i]]
@@ -892,6 +954,13 @@ function graphChromosomes(chr) {
     linear.svg.selectAll('.chr' + d.chromosome + '-' + d.bin).filter(function(o){ return !d3.select(this).classed('pinned') }).remove()
   })
   nodeEnter.on('click', function(d){
+    d3.selectAll('.tile')
+      .filter(function(o){
+        return d3.select(this).attr('opacity') == 1
+      }).datum(function(o){
+        o.pinned = !d.pinned
+        return o
+      })
     d.pinned = !d.pinned
     if (d.pinned) pinned++
     else pinned--

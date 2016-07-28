@@ -18,6 +18,9 @@ html
         | D&nbsp;&hercon;&nbsp;
         input(type='file', name='coordinatesD')
         br
+        p Optionally load external data values:
+        input(type='file', name='external')
+        br
         br
         input(type='submit', value='Load')
       br
@@ -28,6 +31,12 @@ html
         | 1 <span>\t</span> chr1 4000000 <span>\t</span> 0.0000 <span>\t</span> -10.0000 <span>\t</span> 10.0000
         | 2 <span>\t</span> chr1 5000000 <span>\t</span> 10.0000 <span>\t</span> 0.0000 <span>\t</span> -10.0000
       br
+      p External data file format:
+      div.code
+        | variable1 <span>\t</span> variable2 <span>\t</span> variable3
+        | 1.000000 <span>\t</span> 1.000000 <span>\t</span> 0.000000
+        | 0.000000 <span>\t</span> 1.000000 <span>\t</span> 1.000000
+        | 1.000000 <span>\t</span> 0.000000 <span>\t</span> 1.000000
       p 2D contact map file format:
       div.code
         | 0

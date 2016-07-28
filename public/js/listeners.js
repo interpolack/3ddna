@@ -145,11 +145,11 @@ function onDocumentKeyUp(event) {
     navigate(navigated)
   }
   if (event.keyCode != 13) return
-  var val = $('#search').val()
-  if (val.length == 0 && pinned == 0) {
+  // var val = $('#search').val()
+  if (pinned == 0) {
     navigate(navigation.length - 1)
-  } else if (val.length > 0) {
-    search(val)
+  // } else if (val.length > 0) {
+    // search(val)
   } else if (pinned > 0) {
     if (navigation[navigated].context == 'genome') {
       var pin = []

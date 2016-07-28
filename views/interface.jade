@@ -6,7 +6,6 @@ html
     body
       #left
         #controls
-          input#search(type='text' placeholder='search')
           #settings
             .set
               select#node
@@ -17,6 +16,10 @@ html
               select#link
                 option(value='and') centroid   
               span.icon &origof;
+            .set
+              select#data
+                option(value='chromosome') chromosome
+              span.icon &oplus;
               br
               input#threshold(type='range' value=50 min=0 max=100 step=1)
         #unpin &Cross; &cirmid;&nbsp;

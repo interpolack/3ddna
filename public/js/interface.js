@@ -16,13 +16,14 @@ var rainbow = d3.scale.category20(),
     subWidth,
 
     all = [],
+    external = null,
+    loaded = [],
     genomes = [],
     pdb = [],
     segments = [],
     rap = [],
     chromosomes = [],
     bufferGeometry = [],
-    loaded = {},
 
     pinned = 0,
     navigation = [],
@@ -62,10 +63,24 @@ function loadPDB(resolution) {
   chromosomes = []
 
   var q = queue(1)
+  var n = 1
   q.defer(d3.text, 'uploads/' + data.coordinatesA)
-  if (data.coordinatesB != null) q.defer(d3.text, 'uploads/' + data.coordinatesB)
-  if (data.coordinatesC != null) q.defer(d3.text, 'uploads/' + data.coordinatesC)
-  if (data.coordinatesD != null) q.defer(d3.text, 'uploads/' + data.coordinatesD)
+  if (data.coordinatesB != null) {
+    q.defer(d3.text, 'uploads/' + data.coordinatesB)
+    n++
+  }
+  if (data.coordinatesC != null) {
+    q.defer(d3.text, 'uploads/' + data.coordinatesC)
+    n++
+  }
+  if (data.coordinatesD != null) {
+    q.defer(d3.text, 'uploads/' + data.coordinatesD)
+    n++
+  }
+  if (data.external != null) {
+    q.defer(d3.text, 'uploads/' + data.external)
+    external = true
+  }
   q.awaitAll(function(error, results){
     pdb = results[0].split('\n')
     var chromosome = -1
@@ -91,7 +106,7 @@ function loadPDB(resolution) {
     segments.shift()
     segments.push([index, i - 1])
 
-    for (var r = 0; r < results.length; r++) {
+    for (var r = 0; r < n; r++) {
       pdb = results[r].split('\n')
       var bins = []
       for (var i = 0; i < pdb.length - 1; i++) {
@@ -114,16 +129,19 @@ function loadPDB(resolution) {
         + r + "'></svg</div>"
       )
       $('.main').append(" <b>" + alphabet[r] + "</b>")
-      if (r < results.length - 1) $('.main').append(" &and;")
+      if (r < n - 1) $('.main').append(" &and;")
     }
     subWidth = height / genomes.length
     $('.genome')
       .css('height', subWidth)
       .css('width', subWidth * 3)
     if (genomes.length == 1) d3.selectAll('.graph').remove()
-    else d3.selectAll('.graph,.matrix')
+    else d3.selectAll('.graph')
       .style('width', subWidth - 50)
       .style('height', subWidth - 50)
+    $('.matrix')
+      .css('width', subWidth - 50)
+      .css('height', subWidth - 50)
 
     for (var g = 0; g < genomes.length; g++) {
       var genome = genomes[g]
@@ -147,6 +165,32 @@ function loadPDB(resolution) {
           'z': z,
         })
       }
+    }
+
+    if (external != null) {
+      external = results[results.length - 1].split('\n')
+      var max = []
+      var min = []
+      loaded = external[0].split('\t').map(function(d){
+        max.push(0)
+        min.push(9999999)
+        return d
+      })
+      for (var i = 0; i < loaded.length; i++) {
+        $('#data').append("<option value='" + i + "'>" + loaded[i] + "</option>")
+      }
+      external.shift()
+      for (var i = 0; i < external.length; i++) {
+        external[i] = external[i].split('\t').map(function(d,i){
+          var value = parseFloat(d)
+          if (value > max[i]) max[i] = value
+          if (value < min[i]) min[i] = value
+          return value
+        })
+      }
+      loaded = loaded.map(function(d,i){
+        return [d, min[i], max[i]]
+      })
     }
 
     if (launch) init()
@@ -245,6 +289,16 @@ function init() {
     mapGraphs(build[0], build[2])
   })
 
+  $('#data').on('change', function(event) {
+    var value = event.target.value
+    if (value == "chromosome") {
+      d3.selectAll('.node').attr('stroke', function(d){ return d.pinned ? 1 : 0.2 })
+    } else {
+      value = parseInt(value)
+      d3.selectAll('.node').attr('opacity', function(d,i){ return atLeast((external[d.bin][value] - loaded[value][1]) / loaded[value][2], 0.2) })
+    }
+  })
+
   animate()
 
 }
@@ -261,7 +315,7 @@ function navigate(nav) {
     controls[g].target.copy(navigation[nav].loci[g])
     cameras[g].position.copy(navigation[nav].loci[g])
     if (navigation[nav].context == 'genome') cameras[g].position.set(11, 11, 11)
-    else cameras[g].position.copy(navigation[nav].loci[g].sub(new THREE.Vector3(8, 8, 8)))
+    else cameras[g].position.copy(navigation[nav].loci[g].clone().sub(new THREE.Vector3(8, 8, 8)))
   }
   graph.container.attr('transform', 'scale(1)')
 

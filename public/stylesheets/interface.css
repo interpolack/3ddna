@@ -39,7 +39,7 @@ html, body {
     opacity: 0.5;
   }
   #link {
-    cursor: pointer;
+    pointer-events: none;
     opacity: 0.5;
   }
   #threshold {

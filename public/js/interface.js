@@ -157,11 +157,42 @@ function loadPDB(resolution) {
         d3.selectAll('.node').attr('opacity', function(d,i){ return i == x || i == y ? 1 : 0.2 })
         for (var g = 0; g < genomes.length; g++) {
           d3.select('#graph' + g).selectAll('.node').attr('opacity', function(d,i){ return i == x || i == y ? 1 : 0.2 })
+          if (navigation[navigated].context == 'genome') {
+            for (var i = 0; i < segments.length; i++) {
+              var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
+              if (i == x || i == y || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
+              else for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.2
+              geometries[g][i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+            }
+          } else {
+            var chr = navigation[navigated].chromosomes
+            for (var i = 0; i < chr.length; i++) {
+              var segment = segments[chr[i]]
+              var geometry = geometries[g][chr[i]]
+              var mesh = meshes[g][chr[i]]
+              var total = geometry.attributes.alpha.count
+              var bins = segment[1] - segment[0]
+              var size = parseInt(total / bins)
+              for (var j = segment[0]; j < segment[1]; j++) {
+                if (all[j].bin - segment[0] == x || all[j].bin - segment[0] == y || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
+                else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
+              }
+              geometry.attributes.alpha.needsUpdate = true
+            }
+          }
         }
       })
       .mouseleave(function(e){
         if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', 1)
         else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+        for (var g = 0; g < genomes.length; g++) {
+          for (var i = 0; i < segments.length; i++) {
+            var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
+            if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
+            else for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.2
+            geometries[g][i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+          }
+        }
       })
 
     for (var g = 0; g < genomes.length; g++) {

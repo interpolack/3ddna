@@ -136,6 +136,9 @@ html, body {
       margin: 25px 0 0 25px;
       float: left;
     }
+    .genome .matrix {
+      cursor: cell;
+    }
     .genome canvas {
       cursor: move;
     }

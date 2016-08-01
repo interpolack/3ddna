@@ -27,13 +27,17 @@ function onDocumentMouseMove(event, g) {
       .attr('height', y2 - y1)
   }
 
-  return // TODO
+  if (event.target.nodeName != 'CANVAS') return
 
-  mouse.x = ((event.clientX - (width * windowRatio)) / renderers[g].domElement.clientWidth) * 2 - 1
-  mouse.y = -(event.clientY / renderers[g].domElement.clientHeight) * 2 + 1
+  var offset = event.target.getBoundingClientRect()
+  var x = event.clientX - offset.left
+  var y = event.clientY - offset.top
 
-  raycaster.setFromCamera(mouse, camera)
-  var intersections = raycaster.intersectObjects(genome.children)
+  mouse.x = (x / (subWidth - 50)) * 2 - 1
+  mouse.y = -(y / (subWidth - 50)) * 2 + 1
+
+  raycaster.setFromCamera(mouse, cameras[0])
+  var intersections = raycaster.intersectObjects(models[0].children)
   var intersection = intersections.length > 0 ? intersections[0] : null
 
   if (shifting && intersection !== null && intersection.object.visible && intersection.object.name !== "") {
@@ -46,7 +50,10 @@ function onDocumentMouseMove(event, g) {
       alphaModel(0.2, navigation[navigated].chromosomes)
       alphaBin(chromosome, bin, 1)
       var node = graph.chromosomes.nodesDict[chromosome + ':' + bin]
-      graph.svg.selectAll('.node').attr('opacity', function(d,i){ return i == node ? 1 : 0.2 })
+      d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return i == node || d.i == node || d.j == node ? 1 : 0.2 })
+      for (var g = 0; g < genomes.length; g++) {
+        d3.select('#graph' + g).selectAll('.node', function(d,i){ return i == node ? 1 : 0.2 })
+      }
     }
   }
 }
@@ -137,17 +144,21 @@ function onDocumentMouseUp(event) {
 }
 
 function onDocumentKeyDown(event) {
-  if (event.shiftKey) shifting = true
+  if (event.shiftKey) {
+    document.body.style.cursor = 'cell'
+    shifting = true
+  }
 }
 
 function onDocumentKeyUp(event) {
   event.preventDefault()
   if (shifting) {
     if (navigation[navigated].context == 'chromosomes') {
-      if (pinned == 0) d3.selectAll('.node').attr('opacity', 1)
-      else d3.selectAll('.node').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+      if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', 1)
+      else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
       alphaModelFromGraph()
     }
+    document.body.style.cursor = 'default'
     shifting = false
   }
   if (navigated > 0 && (event.keyCode == 8 || event.keyCode == 46)) {

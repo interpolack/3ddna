@@ -143,6 +143,26 @@ function loadPDB(resolution) {
     $('.matrix')
       .css('width', subWidth - 50)
       .css('height', subWidth - 50)
+      .mousemove(function(e){
+        var offset = $(this).position()
+        var x = e.pageX - offset.left
+        var y = e.pageY - offset.top
+        x = (x - 50) / (subWidth - 100)
+        y = (y - 50) / (subWidth - 100)
+        if (x < 0 || x > 1 || y < 0 || y > 1) return
+        var rows = parseInt($(this).attr('rows'))
+        x = parseInt(x * rows)
+        y = parseInt(y * rows)
+        d3.selectAll('.tile').attr('opacity', function(d){ return d.i != x && d.j != y ? 0.2 : 1 })
+        d3.selectAll('.node').attr('opacity', function(d,i){ return i == x || i == y ? 1 : 0.2 })
+        for (var g = 0; g < genomes.length; g++) {
+          d3.select('#graph' + g).selectAll('.node').attr('opacity', function(d,i){ return i == x || i == y ? 1 : 0.2 })
+        }
+      })
+      .mouseleave(function(e){
+        if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', 1)
+        else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+      })
 
     for (var g = 0; g < genomes.length; g++) {
       var genome = genomes[g]
@@ -656,8 +676,8 @@ function colorGraphs(colors, chr) {
       .attr('fill', function(d,i){ return colors[i] })
     // color the matrices:
     var submatrix = d3.select('#matrix' + g)
-    submatrix.selectAll('.tile')
-      .attr('fill', function(d,i){ return colors[d.i] })
+    if (coloring == 'chromosome') submatrix.selectAll('.tile').attr('fill', function(d,i){ return d.color })
+    else submatrix.selectAll('.tile').attr('fill', function(d,i){ return colors[d.i] })
     // color the models:
     for (var j = 0; j < chr.length; j++) {
       var i = chr[j]
@@ -739,6 +759,7 @@ function mapGraphs(nodes, links, keep) {
     }
     var size = keep == null ? (subWidth - 100) / nodes.length : (subWidth - 100) / keep.length
     submatrix.attr('size', size)
+    submatrix.attr('rows', Math.sqrt(tiles.length))
     submatrix.selectAll('.tile')
       .data(tiles)
       .enter()
@@ -756,6 +777,7 @@ function mapGraphs(nodes, links, keep) {
         color.r = parseInt(color.r / d.distance * 5 + 1)
         color.g = parseInt(color.g / d.distance * 5 + 1)
         color.b = parseInt(color.b / d.distance * 5 + 1)
+        d.color = color
         return color
       })
       .attr('class', 'tile')

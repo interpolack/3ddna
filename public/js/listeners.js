@@ -10,7 +10,8 @@ function onWindowResize() {
 }
 
 function onDocumentMouseMove(event, g) {
-  // event.preventDefault()
+
+  document.body.style.cursor = 'default'
 
   if (g == null && !shifting && dragging) {
     var a = {'x': click.x, 'y': click.y}

@@ -123,6 +123,9 @@ html, body {
   overflow-x : scroll;
   overflow-y: hidden;
 }
+.label {
+  font-size: 8px;
+}
   .genome {
     position: relative;
     height: 250px;
@@ -137,10 +140,17 @@ html, body {
       float: left;
     }
     .genome .matrix {
-      cursor: cell;
+      cursor: crosshair;
+      overflow: visible;
     }
     .genome canvas {
       cursor: move;
+    }
+    .genome .model .label {
+      position: absolute;
+    }
+    .genome .matrix .label {
+      font-size: 6px;
     }
     .title {
       position: absolute;

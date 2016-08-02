@@ -17,6 +17,7 @@ var rainbow = d3.scale.category20(),
 
     all = [],
     external = null,
+    genes = null,
     loaded = [],
     coloring = 'chromosome',
     genomes = [],
@@ -39,6 +40,7 @@ var rainbow = d3.scale.category20(),
     models = {},
     geometries = {},
     meshes = {},
+    labels = {},
     sphere,
     raycaster = new THREE.Raycaster(),
     mouse = new THREE.Vector2(),
@@ -82,6 +84,10 @@ function loadPDB(resolution) {
     q.defer(d3.text, 'uploads/' + data.external)
     external = true
   }
+  if (data.genes != null) {
+    q.defer(d3.text, 'uploads/' + data.genes)
+    genes = []
+  }
   q.awaitAll(function(error, results){
     pdb = results[0].split('\n')
     var chromosome = -1
@@ -103,6 +109,7 @@ function loadPDB(resolution) {
         'chromosome': chromosome,
         'bin': i,
       })
+      if (genes != null) genes.push([])
     }
     segments.shift()
     segments.push([index, i - 1])
@@ -220,7 +227,7 @@ function loadPDB(resolution) {
     }
 
     if (external != null) {
-      external = results[results.length - 1].split('\n')
+      external = results[n].split('\n')
       var max = []
       var min = []
       loaded = external[0].split('\t').map(function(d){
@@ -245,9 +252,28 @@ function loadPDB(resolution) {
       })
     }
 
+    if (genes != null) {
+      var chr = null
+      var chromosome = 0
+      var rows = results[results.length - 1].split('\n')
+      chr = rows[0].split(' ')[0]
+      for (var i = 0; i < rows.length - 1; i++) {
+        var row = rows[i].split(' ')
+        if (chr != row[0]) {
+          chromosome++
+          chr = row[0]
+        }
+        var bin = Math.round(parseInt(row[1].split('-')[0]) / 1000000)
+        bin += segments[chromosome][0]
+        genes[bin].push(row[3])
+        if (genes[bin + segments[parseInt((segments.length) / 2)][1] - 1] != null) genes[bin + segments[parseInt((segments.length) / 2)][1] - 1].push(row[3]) // TODO
+      }
+    }
+
     if (launch) init()
     graphGenome()
     modelGenome()
+    animate()
   })
 }
 
@@ -377,8 +403,6 @@ function init() {
     colorGraphs(colors, navigation[navigated].chromosomes)
   })
 
-  animate()
-
 }
 
 function navigate(nav) {
@@ -431,41 +455,50 @@ function navigate(nav) {
 
 function search(query) {
   $('#search').val("")
-  // TODO: pinned-specific search?
-  if (!loaded[query]) return alert("search not found")
+  $('.label').remove()
 
-  if (navigation[navigated].context == 'genome') {
-    var nodes = graph.genome.nodes
-    for (var i = 0; i < chromosomes.length; i++) {
-      var segment = segments[i]
-      chromosomes[i].found = 0
-      for (var j = segment[0]; j < segment[1]; j++) {
-        chromosomes[i].found += all[j][query]
-      }
-      chromosomes[i].found /= (segment[1] - segment[0])
-    }
-    max = 0
-    for (var i = 0; i < chromosomes.length; i++) {
-      if (chromosomes[i].found > max) max = chromosomes[i].found
-    }
-    graph.svg.selectAll('.node').attr('opacity', function(d){ return atLeast(d.found / max, 0.2) })
-    for (var g = 0; g < genomes.length; g++) {
-      for (var i = 0; i < chromosomes.length; i++) {
-        var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
-        for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = atLeast(chromosomes[i].found / max, 0.2)
-        geometries[g][i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+  for (var chromosome = 0; chromosome < segments.length; chromosome++) {
+    if (navigation[navigated].context == 'chromosomes' && navigation[navigated].chromosomes.indexOf(chromosome) < 0) continue
+    var segment = segments[chromosome]
+    for (var i = segment[0]; i < segment[1]; i++) {
+      for (var j = 0; j < genes[i].length; j++) {
+        var gene = genes[i][j].toLowerCase()
+        if (gene.includes(query)) addLabel(gene, chromosome, i)
       }
     }
-  } else if (navigation[navigated].context == 'chromosomes') {
-    var nodes = graph.chromosomes.nodes
-    max = 0
-    for (var i = 0; i < nodes.length; i++) {
-      nodes[i].found = all[nodes[i].bin][query]
-      if (nodes[i].found > max) max = nodes[i].found
-    }
-    graph.svg.selectAll('.node').attr('opacity', function(d){ return atLeast(d.found / max, 0.3) })
-    alphaModelFromGraph(max)
   }
+}
+
+function addLabel(text, chromosome, bin) {
+  for (var g = 0; g < genomes.length; g++) {
+    var element = $("<div class='label'>" + text + "</div>")
+    labels[g].push({
+      'element': element,
+      'position': genomes[g].bins[bin],
+    })
+    $('#model' + g).append(element)
+    var submatrix = d3.select('#matrix' + g)
+    if (navigation[navigated].context == 'chromosomes') {
+      submatrix.append('text')
+        .text(text)
+        .attr('fill', '#fff')
+        .attr('transform', 'translate(' + ((bin - segments[chromosome][0]) * submatrix.attr('size')) + ',20)rotate(90)')
+        .attr('text-anchor', 'end')
+        .attr('class', 'label')
+      submatrix.append('text')
+        .text(text)
+        .attr('fill', '#fff')
+        .attr('transform', 'translate(20,' + ((bin - segments[chromosome][0]) * submatrix.attr('size')) + ')')
+        .attr('text-anchor', 'end')
+        .attr('class', 'label')
+    }
+  }
+  if (navigation[navigated].context == 'chromosomes') d3.select(graph.svg.selectAll('.node')[0][bin - segments[chromosome][0]]).append('text')
+    .attr('x', 3)
+    .attr('y', -3)
+    .text(text)
+    .attr('fill', '#fff')
+    .attr('class', 'label')
 }
 
 function modelGenome() {
@@ -476,6 +509,7 @@ function modelGenome() {
 
     meshes[g] = []
     geometries[g] = []
+    labels[g] = []
 
     for (var i = 0; i < segments.length; i++) {
       var segment = segments[i]
@@ -1113,6 +1147,31 @@ function animate() {
   render()
 }
 
+function toScreenPosition(position, g) {
+  var vector = new THREE.Vector3()
+  var widthHalf = 0.5 * renderers[g].context.canvas.width
+  var heightHalf = 0.5 * renderers[g].context.canvas.height
+  // obj.updateMatrixWorld()
+  // vector.setFromMatrixPosition(obj.matrixWorld)
+  vector.set(position.x, position.y, position.z)
+  vector.project(cameras[g])
+  vector.x = (vector.x * widthHalf) + widthHalf
+  vector.y = -(vector.y * heightHalf) + heightHalf
+  return {
+    x: vector.x,
+    y: vector.y
+  }
+}
+
 function render() {
-  for (var g = 0; g < genomes.length; g++) renderers[g].render(scenes[g], cameras[g])
+  for (var g = 0; g < genomes.length; g++) {
+    for (var i = 0; i < labels[g].length; i++) {
+      var position = toScreenPosition(labels[g][i].position, g)
+      labels[g][i].element.css({
+        'left': position.x,
+        'top': position.y,
+      })
+    }
+    renderers[g].render(scenes[g], cameras[g])
+  }
 }

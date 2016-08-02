@@ -21,6 +21,9 @@ html
         p Optionally load external data values:
         input(type='file', name='external')
         br
+        p As well as gene locations:
+        input(type='file', name='genes')
+        br
         br
         input(type='submit', value='Load')
       br
@@ -37,6 +40,8 @@ html
         | 1.000000 <span>\t</span> 1.000000 <span>\t</span> 0.000000
         | 0.000000 <span>\t</span> 1.000000 <span>\t</span> 1.000000
         | 1.000000 <span>\t</span> 0.000000 <span>\t</span> 1.000000
-      p 2D contact map file format:
+      p Gene location file format:
       div.code
-        | 0
+        | chr1 <span>\s</span> 3204562-3661579 <span>\s</span> NM_001011874 <span>\s</span> Xkr4
+        | chr1 <span>\s</span> 4333587-4350395 <span>\s</span> NM_011283 <span>\s</span> Rp1
+        | chr1 <span>\s</span> 4481008-4486494 <span>\s</span> NM_011441 <span>\s</span> Sox17

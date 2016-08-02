@@ -52,7 +52,7 @@ function onDocumentMouseMove(event, g) {
       var node = graph.chromosomes.nodesDict[chromosome + ':' + bin]
       d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return i == node || d.i == node || d.j == node ? 1 : 0.2 })
       for (var g = 0; g < genomes.length; g++) {
-        d3.select('#graph' + g).selectAll('.node', function(d,i){ return i == node ? 1 : 0.2 })
+        d3.select('#graph' + g).selectAll('.node', function(d,i){ console.log(i, node); return i == node ? 1 : 0.2 })
       }
     }
   }
@@ -166,11 +166,11 @@ function onDocumentKeyUp(event) {
     navigate(navigated)
   }
   if (event.keyCode != 13) return
-  // var val = $('#search').val()
-  if (pinned == 0) {
+  var val = $('#search').val()
+  if (val.length > 0) {
+    search(val)
+  } else if (pinned == 0) {
     navigate(navigation.length - 1)
-  // } else if (val.length > 0) {
-    // search(val)
   } else if (pinned > 0) {
     if (navigation[navigated].context == 'genome') {
       var pin = []

@@ -148,6 +148,9 @@ html, body {
     }
     .genome .model .label {
       position: absolute;
+      background-color: rgba(0,0,0,0.5);
+      padding: 5px;
+      border-radius: 2px;
     }
     .genome .matrix .label {
       font-size: 6px;

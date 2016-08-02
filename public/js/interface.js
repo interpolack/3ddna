@@ -519,7 +519,7 @@ function search(query) {
 
 function addLabel(text, chromosome, bin) {
   for (var g = 0; g < genomes.length; g++) {
-    var element = $("<div class='label'>" + text + "</div>")
+    var element = $("<div class='label'>" + text + "</div>").css({'color': rainbow(chromosome)})
     labels[g].push({
       'element': element,
       'position': genomes[g].bins[bin],
@@ -1017,28 +1017,32 @@ function graphChromosomes(chr) {
         .attr('pointer-events', 'none')
         .attr('class', 'tooltip')
       element.append('text')
-        .text(external[d.bin][coloring])
+        .text(Math.round(external[d.bin][coloring] * 1000) / 1000)
         .attr('fill', color)
         .attr('x', 16)
         .attr('y', 18)
         .attr('pointer-events', 'none')
         .attr('class', 'tooltip')
+      rect.attr('width', 44).attr('height', 44)
     }
     if (genes != null) {
-      var height = 8
+      var h = 8
+      var w = 0
       element.selectAll('.gene')
         .data(genes[d.bin])
         .enter()
         .append('text')
-        .text(function(d){ return d })
-        .attr('fill', '#999')
+        .text(function(d){
+          if (d.length > w) w = d.length
+          return d })
+        .attr('fill', '#bbb')
         .attr('font-size', '8px')
-        .attr('x', 40)
+        .attr('x', 50)
         .attr('y', function(d,i){
-          height += 10
+          h += 10
           return -8 + (10 * i) })
         .attr('class', 'tooltip gene')
-      if (genes[d.bin].length > 0) rect.attr('width', 84).attr('height', atLeast(height, 26))
+      if (genes[d.bin].length > 0) rect.attr('width', 50 + (w * 5)).attr('height', atLeast(h, rect.attr('height')))
     }
     for (var g = 0; g < genomes.length; g++) {
       for (var i = 0; i < chr.length; i++) {

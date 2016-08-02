@@ -195,9 +195,23 @@ function loadPDB(resolution) {
         for (var g = 0; g < genomes.length; g++) {
           for (var i = 0; i < segments.length; i++) {
             var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
-            if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
-            else for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.2
-            geometries[g][i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+            if (navigation[navigated].context == 'genome') {
+              if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
+              else for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.2
+              geometries[g][i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+            } else if (navigation[navigated].chromosomes.indexOf(i) >= 0) {
+              var segment = segments[i]
+              var geometry = geometries[g][i]
+              var mesh = meshes[g][i]
+              var total = geometry.attributes.alpha.count
+              var bins = segment[1] - segment[0]
+              var size = parseInt(total / bins)
+              for (var j = segment[0]; j < segment[1]; j++) {
+                if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
+                else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
+              }
+              geometry.attributes.alpha.needsUpdate = true
+            }
           }
         }
       })
@@ -468,7 +482,9 @@ function navigate(nav) {
     if (navigation[navigated].chromosomes != navigation[nav].chromosomes) graphChromosomes(navigation[nav].chromosomes)
     for (var i = 0; i < navigation[nav].nodes.length; i++) {
       keep.push(navigation[nav].nodes[i])
-      graph.chromosomes.nodes[navigation[nav].nodes[i]].pinned = true
+      var node = graph.chromosomes.nodes[navigation[nav].nodes[i]]
+      node.pinned = true
+      all[node.index].pinned = true
       pinned++
     }
     d3.selectAll('.node').attr('opacity', function(d){ return d.pinned ? 1 : 0.3 })
@@ -774,22 +790,6 @@ function colorRows(colors, chr) {
     var submatrix = d3.select('#matrix' + g)
     if (coloring == 'chromosome') submatrix.selectAll('.tile').attr('fill', function(d,i){ return d.color })
     else submatrix.selectAll('.tile').attr('fill', function(d,i){ return colors[d.i] })
-    // color the models:
-    // for (var j = 0; j < chr.length; j++) {
-    //   var i = chr[j]
-    //   var total = geometries[g][i].attributes.position.count
-    //   var bins = segments[i][1] - segments[i][0]
-    //   var size = parseInt(total / bins)
-    //   for (var bin = 0; bin < colors.length; bin++) {
-    //     var color = d3.rgb(colors[bin])
-    //     for (var v = bin * size; v < (bin + 1) * size; v++) {
-    //       geometries[g][i].attributes.color.array[(v * 3)] = color.r / 255
-    //       geometries[g][i].attributes.color.array[(v * 3) + 1] = color.g / 255
-    //       geometries[g][i].attributes.color.array[(v * 3) + 2] = color.b / 255
-    //     }
-    //   }
-    //   geometries[g][i].attributes.color.needsUpdate = true
-    // }
   }
 }
 
@@ -881,12 +881,10 @@ function updateRows(nodes, links, keep) {
 }
 
 function linkChromosomes(nodes) {
-  graph.svg.selectAll('.link,.shadow').remove()
-  if (nodes.length > graph.chromosomes.bins) nodes = nodes.slice(0, graph.chromosomes.bins)
+  graph.svg.selectAll('.link').remove()
   var links = []
   var others = []
   var linked = {}
-  var doubled = {}
   for (var i = 0; i < graph.chromosomes.bins; i++) {
     nodes[i].pinned = false
     var bin = nodes[i]

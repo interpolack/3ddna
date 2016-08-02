@@ -369,7 +369,7 @@ function init() {
     g = null
   })
   $('#threshold').on('mouseup', function(event) {
-    mapGraphs(build[0], build[2])
+    updateRows(build[0], build[2])
   })
 
   $('#data').on('change', function(event) {
@@ -382,27 +382,58 @@ function init() {
           colors.push(color)
           return color
         })
+      for (var g = 0; g < genomes.length; g++) {
+        for (var j = 0; j < chromosomes.length; j++) {
+          var i = chromosomes[j].chromosome
+          var total = geometries[g][i].attributes.position.count
+          var bins = segments[i][1] - segments[i][0]
+          var size = parseInt(total / bins)
+          var color = d3.rgb(rainbow(i))
+          for (var bin = 0; bin < segments[segments.length - 1][1]; bin++) {
+            for (var v = bin * size; v < (bin + 1) * size; v++) {
+              geometries[g][i].attributes.color.array[(v * 3)] = color.r / 255
+              geometries[g][i].attributes.color.array[(v * 3) + 1] = color.g / 255
+              geometries[g][i].attributes.color.array[(v * 3) + 2] = color.b / 255
+            }
+          }
+          geometries[g][i].attributes.color.needsUpdate = true
+        }
+      }
     } else {
-      value = parseInt(value)
-      if (loaded[value][1] == 0.0 && loaded[value][2] == 1.0) d3.selectAll('.node').select('circle')
-        .attr('fill', function(d,i){
-          var color = external[d.bin][value] ? '#1cf278' : '#f21c5c'
-          colors.push(color)
-          return color
-        })
-      else d3.selectAll('.node').select('circle')
-        .attr('fill', function(d,i){
-          var r = 255 - 255 * (external[d.bin][value] - loaded[value][1]) / loaded[value][2]
-          var b = 255 * (external[d.bin][value] - loaded[value][1]) / loaded[value][2]
-          var color = d3.rgb(r, 50, b)
-          colors.push(color)
-          return color
-        })
+      for (var g = 0; g < genomes.length; g++) {
+        for (var j = 0; j < chromosomes.length; j++) {
+          var i = chromosomes[j].chromosome
+          var total = geometries[g][i].attributes.position.count
+          var bins = segments[i][1] - segments[i][0]
+          var size = parseInt(total / bins)
+          for (var bin = 0; bin < bins; bin++) {
+            var y = (external[segments[i][0] + bin][value] - loaded[value][1]) / loaded[value][2]
+            for (var v = bin * size; v < (bin + 1) * size; v++) {
+              geometries[g][i].attributes.color.array[(v * 3)] = 1 - y
+              geometries[g][i].attributes.color.array[(v * 3) + 1] = y
+              geometries[g][i].attributes.color.array[(v * 3) + 2] = y
+            }
+          }
+          geometries[g][i].attributes.color.needsUpdate = true
+        }
+      }
+    }
+    if (navigation[navigated].context == 'chromosomes') {
+      if (value != "chromosome") {
+        value = parseInt(value)
+        d3.selectAll('.node').select('circle')
+          .attr('fill', function(d,i){
+            var y = 255 * (external[d.bin][value] - loaded[value][1]) / loaded[value][2]
+            var color = d3.rgb(255 - y, y, y)
+            colors.push(color)
+            return color
+          })
+      }
+      coloring = value
+      colorRows(colors, navigation[navigated].chromosomes)
     }
     coloring = value
-    colorGraphs(colors, navigation[navigated].chromosomes)
   })
-
 }
 
 function navigate(nav) {
@@ -428,7 +459,7 @@ function navigate(nav) {
     $('#unpin').css('visibility', 'hidden')
   } else if (navigation[nav].context == 'chromosomes') {
     if (navigation[navigated].chromosomes != navigation[nav].chromosomes) graphChromosomes(navigation[nav].chromosomes)
-    else mapGraphs(graph.chromosomes.nodes, graph.chromosomes.others)
+    else updateRows(graph.chromosomes.nodes, graph.chromosomes.others)
     d3.selectAll('.node').attr('opacity', 1)
     alphaModel(0.8, navigation[nav].chromosomes)
     $('#unpin').css('visibility', 'hidden')
@@ -444,7 +475,7 @@ function navigate(nav) {
     alphaModel(0.8, navigation[nav].chromosomes)
     alphaModelFromGraph()
     $('#unpin').css('visibility', 'visible')
-    mapGraphs(graph.chromosomes.nodes, graph.chromosomes.others, keep)
+    updateRows(graph.chromosomes.nodes, graph.chromosomes.others, keep)
   }
 
   $('#node').val(navigation[nav].node)
@@ -694,7 +725,7 @@ function graphGenome() {
 
   gg.force.nodes(gg.nodes).links(gg.links)
   bakeForce(gg.force, gg.links.length * 2)
-  mapGraphs(gg.nodes, gg.others)
+  updateRows(gg.nodes, gg.others)
 
   linear.svg.line = linear.svg.append('rect')
     .attr('rx', 3)
@@ -733,7 +764,7 @@ function bakeForce(force, iterations) {
 colors: array of colors for each bin
 chr: array of chromosomes to include
 */
-function colorGraphs(colors, chr) {
+function colorRows(colors, chr) {
   for (var g = 0; g < genomes.length; g++) {
     // color the graphs:
     var subgraph = d3.select('#graph' + g)
@@ -744,21 +775,21 @@ function colorGraphs(colors, chr) {
     if (coloring == 'chromosome') submatrix.selectAll('.tile').attr('fill', function(d,i){ return d.color })
     else submatrix.selectAll('.tile').attr('fill', function(d,i){ return colors[d.i] })
     // color the models:
-    for (var j = 0; j < chr.length; j++) {
-      var i = chr[j]
-      var total = geometries[g][i].attributes.position.count
-      var bins = segments[i][1] - segments[i][0]
-      var size = parseInt(total / bins)
-      for (var bin = 0; bin < colors.length; bin++) {
-        var color = d3.rgb(colors[bin])
-        for (var v = bin * size; v < (bin + 1) * size; v++) {
-          geometries[g][i].attributes.color.array[(v * 3)] = color.r / 255
-          geometries[g][i].attributes.color.array[(v * 3) + 1] = color.g / 255
-          geometries[g][i].attributes.color.array[(v * 3) + 2] = color.b / 255
-        }
-      }
-      geometries[g][i].attributes.color.needsUpdate = true
-    }
+    // for (var j = 0; j < chr.length; j++) {
+    //   var i = chr[j]
+    //   var total = geometries[g][i].attributes.position.count
+    //   var bins = segments[i][1] - segments[i][0]
+    //   var size = parseInt(total / bins)
+    //   for (var bin = 0; bin < colors.length; bin++) {
+    //     var color = d3.rgb(colors[bin])
+    //     for (var v = bin * size; v < (bin + 1) * size; v++) {
+    //       geometries[g][i].attributes.color.array[(v * 3)] = color.r / 255
+    //       geometries[g][i].attributes.color.array[(v * 3) + 1] = color.g / 255
+    //       geometries[g][i].attributes.color.array[(v * 3) + 2] = color.b / 255
+    //     }
+    //   }
+    //   geometries[g][i].attributes.color.needsUpdate = true
+    // }
   }
 }
 
@@ -767,7 +798,7 @@ function colorGraphs(colors, chr) {
 / links: links from each of these nodes to all others
 / keep: if not null, do not consider any nodes outside of this array
 */
-function mapGraphs(nodes, links, keep) {
+function updateRows(nodes, links, keep) {
   var r = nodes[0].bin == null ? 3 : 2
   var selector = nodes[0].bin == null ? 'chromosome' : 'bin'
   for (var g = 0; g < genomes.length; g++) {
@@ -1058,7 +1089,7 @@ function graphChromosomes(chr) {
 
   cg.force.nodes(cg.nodes).links(cg.links).start()
   bakeForce(cg.force, cg.links.length)
-  mapGraphs(cg.nodes, cg.others)
+  updateRows(cg.nodes, cg.others)
 
   linear.svg.chromosomes = {}
   var longest = segments[0][1] - segments[0][0]

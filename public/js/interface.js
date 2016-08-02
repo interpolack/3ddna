@@ -485,6 +485,7 @@ function navigate(nav) {
       var node = graph.chromosomes.nodes[navigation[nav].nodes[i]]
       node.pinned = true
       all[node.index].pinned = true
+      // for (var j = 0; j < genes[node.index].length; j++) addLabel(genes[node.index][j], i, node.index)
       pinned++
     }
     d3.selectAll('.node').attr('opacity', function(d){ return d.pinned ? 1 : 0.3 })
@@ -983,6 +984,14 @@ function graphChromosomes(chr) {
     d3.selectAll('.node' + d.bin).attr('opacity', 1)
     var element = d3.select(this)
     element.attr('opacity', 1)
+    var rect = element.append('rect')
+      .attr('opacity', 0.4)
+      .attr('x', 12)
+      .attr('y', -20)
+      .attr('rx', 2)
+      .attr('width', 32)
+      .attr('height', 26)
+      .attr('class', 'tooltip')
     element.append('text')
       .text("1Mb")
       .attr('fill', '#bbb')
@@ -1014,6 +1023,22 @@ function graphChromosomes(chr) {
         .attr('y', 18)
         .attr('pointer-events', 'none')
         .attr('class', 'tooltip')
+    }
+    if (genes != null) {
+      var height = 8
+      element.selectAll('.gene')
+        .data(genes[d.bin])
+        .enter()
+        .append('text')
+        .text(function(d){ return d })
+        .attr('fill', '#999')
+        .attr('font-size', '8px')
+        .attr('x', 40)
+        .attr('y', function(d,i){
+          height += 10
+          return -8 + (10 * i) })
+        .attr('class', 'tooltip gene')
+      if (genes[d.bin].length > 0) rect.attr('width', 84).attr('height', atLeast(height, 26))
     }
     for (var g = 0; g < genomes.length; g++) {
       for (var i = 0; i < chr.length; i++) {

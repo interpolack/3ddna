@@ -84,6 +84,7 @@ html, body {
   #navigation .gene {
     margin-top: 8px;
     color: #999;
+    border-color: #999;
   }
 #left {
   position: relative;

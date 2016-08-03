@@ -49,6 +49,8 @@ function onDocumentMouseMove(event, g) {
       var bin = parseInt(faceIndex / total * bins)
       alphaModel(0.2, navigation[navigated].chromosomes)
       alphaBin(chromosome, bin, 1)
+      $('.gene').remove()
+      $('#navigation').append("<div class='gene'>" + genes[segments[chromosome][0] + bin].join("<br>") + "</div>")
       var node = graph.chromosomes.nodesDict[chromosome + ':' + bin]
       d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return i == node || d.i == node || d.j == node ? 1 : 0.2 })
       for (var g = 0; g < genomes.length; g++) {
@@ -159,6 +161,7 @@ function onDocumentKeyUp(event) {
       alphaModelFromGraph()
     }
     document.body.style.cursor = 'default'
+    $('.gene').remove()
     shifting = false
   }
   if (navigated > 0 && (event.keyCode == 8 || event.keyCode == 46)) {

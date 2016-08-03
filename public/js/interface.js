@@ -180,6 +180,10 @@ function loadPDB(resolution) {
               var total = geometry.attributes.alpha.count
               var bins = segment[1] - segment[0]
               var size = parseInt(total / bins)
+              if (genes != null) {
+                $('.gene').remove()
+                $('#navigation').append("<div class='gene'>" + genes[segment[0] + x].join("<br>") + "</div><hr class='gene'><div class='gene'>" + genes[segment[0] + y].join("<br>") + "</div>")
+              }
               for (var j = segment[0]; j < segment[1]; j++) {
                 if (all[j].bin - segment[0] == x || all[j].bin - segment[0] == y || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
                 else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
@@ -190,6 +194,7 @@ function loadPDB(resolution) {
         }
       })
       .mouseleave(function(e){
+        $('.gene').remove()
         if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', 1)
         else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
         for (var g = 0; g < genomes.length; g++) {
@@ -1013,9 +1018,7 @@ function graphChromosomes(chr) {
         .attr('class', 'tooltip')
       rect.attr('width', 44).attr('height', 44)
     }
-    if (genes != null) {
-      $('#navigation').append("<div class='gene'>" + genes[d.bin].join("<br>") + "</div>")
-    }
+    if (genes != null) $('#navigation').append("<div class='gene'>" + genes[d.bin].join("<br>") + "</div>")
     for (var g = 0; g < genomes.length; g++) {
       for (var i = 0; i < chr.length; i++) {
         var segment = segments[chr[i]]

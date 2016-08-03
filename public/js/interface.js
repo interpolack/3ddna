@@ -297,9 +297,10 @@ function init() {
   graph.svg = d3.select('#graph').append('svg')
     .attr('width', width * windowRatio)
     .attr('height', height)
-  graph.floor = graph.svg.append('g')
     .call(zoom)
     .on('mousedown.zoom', null)
+  graph.floor = graph.svg.append('g')
+
   graph.floor.append('rect')
     .attr('width', width * windowRatio)
     .attr('height', height)
@@ -396,40 +397,27 @@ function init() {
           colors.push(color)
           return color
         })
-      for (var g = 0; g < genomes.length; g++) {
-        for (var j = 0; j < chromosomes.length; j++) {
-          var i = chromosomes[j].chromosome
-          var total = geometries[g][i].attributes.position.count
-          var bins = segments[i][1] - segments[i][0]
-          var size = parseInt(total / bins)
-          var color = d3.rgb(rainbow(i))
-          for (var bin = 0; bin < segments[segments.length - 1][1]; bin++) {
-            for (var v = bin * size; v < (bin + 1) * size; v++) {
-              geometries[g][i].attributes.color.array[(v * 3)] = color.r / 255
-              geometries[g][i].attributes.color.array[(v * 3) + 1] = color.g / 255
-              geometries[g][i].attributes.color.array[(v * 3) + 2] = color.b / 255
-            }
-          }
-          geometries[g][i].attributes.color.needsUpdate = true
-        }
       }
-    } else {
-      for (var g = 0; g < genomes.length; g++) {
-        for (var j = 0; j < chromosomes.length; j++) {
-          var i = chromosomes[j].chromosome
-          var total = geometries[g][i].attributes.position.count
-          var bins = segments[i][1] - segments[i][0]
-          var size = parseInt(total / bins)
-          for (var bin = 0; bin < bins; bin++) {
-            var y = (external[segments[i][0] + bin][value] - loaded[value][1]) / loaded[value][2]
-            for (var v = bin * size; v < (bin + 1) * size; v++) {
-              geometries[g][i].attributes.color.array[(v * 3)] = 1 - y
-              geometries[g][i].attributes.color.array[(v * 3) + 1] = y
-              geometries[g][i].attributes.color.array[(v * 3) + 2] = y
-            }
+    for (var g = 0; g < genomes.length; g++) {
+      for (var j = 0; j < chromosomes.length; j++) {
+        var i = chromosomes[j].chromosome
+        var total = geometries[g][i].attributes.position.count
+        var bins = segments[i][1] - segments[i][0]
+        var size = parseInt(total / bins)
+        var y = {'r': 0, 'g': 0, 'b': 0}
+        if (value == 'chromosome') y = d3.rgb(rainbow(i))
+        for (var bin = 0; bin < bins; bin++) {
+          if (value != 'chromosome') {
+            y.g = y.b = 255 * (external[segments[i][0] + bin][value] - loaded[value][1]) / loaded[value][2]
+            y.r = 255 - y.b
           }
-          geometries[g][i].attributes.color.needsUpdate = true
+          for (var v = bin * size; v < (bin + 1) * size; v++) {
+            geometries[g][i].attributes.color.array[(v * 3)] = y.r / 255
+            geometries[g][i].attributes.color.array[(v * 3) + 1] = y.g / 255
+            geometries[g][i].attributes.color.array[(v * 3) + 2] = y.b / 255
+          }
         }
+        geometries[g][i].attributes.color.needsUpdate = true
       }
     }
     if (navigation[navigated].context == 'chromosomes') {
@@ -530,13 +518,13 @@ function addLabel(text, chromosome, bin) {
       submatrix.append('text')
         .text(text)
         .attr('fill', '#fff')
-        .attr('transform', 'translate(' + ((bin - segments[chromosome][0]) * submatrix.attr('size')) + ',20)rotate(90)')
+        .attr('transform', 'translate(' + (25 + (bin - segments[chromosome][0]) * submatrix.attr('size')) + ',20)rotate(90)')
         .attr('text-anchor', 'end')
         .attr('class', 'label')
       submatrix.append('text')
         .text(text)
         .attr('fill', '#fff')
-        .attr('transform', 'translate(20,' + ((bin - segments[chromosome][0]) * submatrix.attr('size')) + ')')
+        .attr('transform', 'translate(20,' + (25 + (1 + bin - segments[chromosome][0]) * submatrix.attr('size')) + ')')
         .attr('text-anchor', 'end')
         .attr('class', 'label')
     }
@@ -947,8 +935,8 @@ function graphChromosomes(chr) {
   var cg = graph.chromosomes = {}
   cg.force = d3.layout.force()
     .size([width * windowRatio, height])
-    .linkDistance(function(d){ return d.distance * 3 })
-    .linkStrength(function(d){ return d.physical < 0 ? 0.1 : 1 })
+    .linkDistance(function(d){ return d.distance / 10 })
+    .linkStrength(function(d){ return d.physical < 0 ? 0.5 : 1 })
     .charge(-30)
   cg.nodes = []
   cg.nodesDict = {}

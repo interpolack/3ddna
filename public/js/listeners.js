@@ -210,7 +210,6 @@ function onDocumentKeyUp(event) {
         pin.push(bin.bin)
         nin.push(i)
       }
-      console.log(pin.length)
       var loci = []
       for (var g = 0; g < genomes.length; g++) {
         var locus = null
@@ -221,7 +220,7 @@ function onDocumentKeyUp(event) {
           var segment = segments[bin.chromosome]
           var bins = segment[1] - segment[0]
           var size = parseInt(total / bins)
-          var target = (bin.bin - segment[0]) * size * 3
+          var target = (nodes[i].bin - segment[0]) * size * 3
           var center = new THREE.Vector3(
             geometry.attributes.position.array[target],
             geometry.attributes.position.array[target + 1],

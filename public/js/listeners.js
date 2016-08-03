@@ -104,7 +104,7 @@ function onDocumentMouseUp(event) {
             .attr('x2', 20 + node.bin * linear.ratio)
             .attr('y1', 70 + 0)
             .attr('y2', 70 + 10)
-            .attr('class', 'active highlight chr' + node.chromosome + '-' + node.bin)
+            .attr('class', 'pinned active highlight chr' + node.chromosome + '-' + node.bin)
           var ratio = 1 / (segments[0][1] - segments[0][0]) * ((width * windowRatio) - 70)
           linear.svg.chromosomes[node.chromosome].append('line')
             .attr('stroke', rainbow(node.chromosome))
@@ -112,7 +112,7 @@ function onDocumentMouseUp(event) {
             .attr('x2', 15 + 20 + (node.bin - segments[node.chromosome][0]) * ratio)
             .attr('y1', 0)
             .attr('y2', 10)
-            .attr('class', 'active highlight chr' + node.chromosome + '-' + node.bin)
+            .attr('class', 'pinned active highlight chr' + node.chromosome + '-' + node.bin)
         }
         chromosomes[node.chromosome].pinned = node.pinned = true
         pins.push(i)

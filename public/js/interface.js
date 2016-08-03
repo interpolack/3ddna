@@ -1014,23 +1014,7 @@ function graphChromosomes(chr) {
       rect.attr('width', 44).attr('height', 44)
     }
     if (genes != null) {
-      var h = 8
-      var w = 0
-      element.selectAll('.gene')
-        .data(genes[d.bin])
-        .enter()
-        .append('text')
-        .text(function(d){
-          if (d.length > w) w = d.length
-          return d })
-        .attr('fill', '#bbb')
-        .attr('font-size', '8px')
-        .attr('x', 50)
-        .attr('y', function(d,i){
-          h += 10
-          return -8 + (10 * i) })
-        .attr('class', 'tooltip gene')
-      if (genes[d.bin].length > 0) rect.attr('width', 50 + (w * 5)).attr('height', atLeast(h, rect.attr('height')))
+      $('#navigation').append("<div class='gene'>" + genes[d.bin].join("<br>") + "</div>")
     }
     for (var g = 0; g < genomes.length; g++) {
       for (var i = 0; i < chr.length; i++) {
@@ -1069,6 +1053,7 @@ function graphChromosomes(chr) {
     if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', 1)
     else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
     d3.select(this).selectAll('.tooltip').remove()
+    $('.gene').remove()
     for (var g = 0; g < genomes.length; g++) {
       for (var i = 0; i < chr.length; i++) {
         var segment = segments[chr[i]]

@@ -81,6 +81,10 @@ html, body {
   #navigation .nav:hover {
     color: #00c4f4;
   }
+  #navigation .gene {
+    margin-top: 8px;
+    color: #999;
+  }
 #left {
   position: relative;
   float: left;

@@ -24,6 +24,7 @@ function drawCrosshair(g, index, center) {
 function alphaModelFromGraph(max) {
   var chr = graph.chromosomes.chr
   for (var g = 0; g < genomes.length; g++) {
+    if (genomes[g].type == '2D Matrix') continue
     for (var i = 0; i < chr.length; i++) {
       var segment = segments[chr[i]]
       var geometry = geometries[g][chr[i]]
@@ -43,6 +44,7 @@ function alphaModelFromGraph(max) {
 
 function alphaModel(alpha, visible) {
   for (var g = 0; g < genomes.length; g++) {
+    if (genomes[g].type == '2D Matrix') continue
     for (var i = 0; i < chromosomes.length; i++) {
       if (visible != null && visible.indexOf(i) == -1) meshes[g][i].visible = false
       else {

@@ -128,6 +128,7 @@ function onDocumentMouseUp(event) {
       })
     if (navigation[navigated].context == 'genome') {
       for (var g = 0; g < genomes.length; g++) {
+        if (genomes[g].type == '2D Matrix') continue
         for (var i = 0; i < chromosomes.length; i++) {
           var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
           if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
@@ -182,6 +183,7 @@ function onDocumentKeyUp(event) {
       }
       var loci = []
       for (var g = 0; g < genomes.length; g++) {
+        if (genomes[g].type == '2D Matrix') continue
         var locus = null
         for (var i = 0; i < chromosomes.length; i++) {
           if (chromosomes[i].pinned) {
@@ -199,7 +201,7 @@ function onDocumentKeyUp(event) {
         'link': 'and',
         'chromosomes': pin,
         'loci': loci,
-        'threshold': 50,
+        'threshold': 30,
         'index': navigation.length,
       })
     } else if (navigation[navigated].context == 'chromosomes') {
@@ -244,7 +246,7 @@ function onDocumentKeyUp(event) {
         'bins': pin,
         'nodes': nin,
         'loci': loci,
-        'threshold': 50,
+        'threshold': 30,
         'root': navigation[navigated].index,
       })
     } else if (navigation[navigated].context == 'bins') {
@@ -289,7 +291,7 @@ function onDocumentKeyUp(event) {
         'bins': pin,
         'nodes': nin,
         'loci': loci,
-        'threshold': 50,
+        'threshold': 30,
         'root': navigation[navigated].root,
       })
     }

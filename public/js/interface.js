@@ -142,6 +142,7 @@ function loadData(resolution) {
     }
 
     for (var r = 0; r < n; r++) {
+      labels[r] = []
       var type = ""
       var model = ""
       if (results[r][0] == "h") {
@@ -155,7 +156,7 @@ function loadData(resolution) {
         genomes.push({
           'type': type,
           'distances': distances,
-          'chromosomes': []
+          'chromosomes': [],
         })
       } else {
         type = "3D Structure"
@@ -380,8 +381,9 @@ function loadData(resolution) {
           chromosome++
           chr = row[0]
         }
-        var bin = Math.round(parseInt(row[1].split('-')[0]) / 1000000)
+        var bin = Math.floor(parseInt(row[1].split('-')[0]) / 1000000)
         bin += segments[chromosome][0]
+        if (genes[bin] == null) break
         genes[bin].push(row[3])
         if (genes[bin + segments[parseInt((segments.length) / 2)][1] - 1] != null) genes[bin + segments[parseInt((segments.length) / 2)][1] - 1].push(row[3]) // TODO
       }
@@ -561,6 +563,7 @@ function setColor(value) {
       })
     }
   for (var g = 0; g < genomes.length; g++) {
+    if (genomes[g].type == '2D Matrix') continue
     for (var j = 0; j < chromosomes.length; j++) {
       var i = chromosomes[j].chromosome
       var total = geometries[g][i].attributes.position.count
@@ -618,7 +621,7 @@ function search(query) {
 function addLabel(text, chromosome, bin) {
   for (var g = 0; g < genomes.length; g++) {
     var element = $("<div class='label'>" + text + "</div>").css({'color': rainbow(chromosome)})
-    labels[g].push({
+    if (genomes[g].type == '3D Structure') labels[g].push({
       'element': element,
       'position': genomes[g].bins[bin],
     })

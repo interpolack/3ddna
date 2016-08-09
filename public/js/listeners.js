@@ -1,6 +1,3 @@
-/*
-/ handle resize
-*/
 function onWindowResize() {
   width = window.innerWidth
   height = window.innerHeight
@@ -8,14 +5,10 @@ function onWindowResize() {
   graph.svg.attr('width', width * windowRatio).attr('height', height)
   linear.svg.attr('width', width * windowRatio)
   linear.svg.line.attr('width', (width * windowRatio) - 50)
+  // camera.updateProjectionMatrix()
   for (var g = 0; g < genomes.length; g++) renderers[g].setSize(subWidth - 50, subWidth - 50)
 }
 
-/*
-/ handle mouse move
-/ handle marquee selection opacity
-/ handle 3D bin selection functionality
-*/
 function onDocumentMouseMove(event, g) {
 
   document.body.style.cursor = 'default'
@@ -43,15 +36,16 @@ function onDocumentMouseMove(event, g) {
   mouse.x = (x / (subWidth - 50)) * 2 - 1
   mouse.y = -(y / (subWidth - 50)) * 2 + 1
 
-  raycaster.setFromCamera(mouse, cameras[0])
-  var intersections = raycaster.intersectObjects(models[0].children)
+  // TODO get appropriate 3D model target, or else only the first 3D viewer will allow 3D selections
+  raycaster.setFromCamera(mouse, cameras[0]) // here
+  var intersections = raycaster.intersectObjects(models[0].children) // here
   var intersection = intersections.length > 0 ? intersections[0] : null
 
   if (shifting && intersection !== null && intersection.object.visible && intersection.object.name !== "") {
     if (pinned == 0 && navigation[navigated].context == 'chromosomes') {
       var chromosome = intersection.object.name
       var faceIndex = intersection.faceIndex
-      var total = geometries[0][chromosome].attributes.alpha.count // TODO 0 indexing only could be dangerous
+      var total = geometries[0][chromosome].attributes.alpha.count // here
       var bins = segments[chromosome][1] - segments[chromosome][0]
       var bin = parseInt(faceIndex / total * bins)
       alphaModel(0.2, navigation[navigated].chromosomes)
@@ -67,10 +61,6 @@ function onDocumentMouseMove(event, g) {
   }
 }
 
-/*
-/ handle mouse down
-/ handle marquee update
-*/
 function onDocumentMouseDown(event) {
   graph.marquee = graph.svg.append('rect')
     .attr('rx', 2)
@@ -85,10 +75,6 @@ function onDocumentMouseDown(event) {
   dragging = true
 }
 
-/*
-/ handle mouse up
-/ handle marquee selection functionality
-*/
 function onDocumentMouseUp(event) {
   if (!shifting && dragging && click.x != event.clientX && click.y != event.clientY) {
     var a = {'x': click.x, 'y': click.y}
@@ -143,6 +129,7 @@ function onDocumentMouseUp(event) {
       })
     if (navigation[navigated].context == 'genome') {
       for (var g = 0; g < genomes.length; g++) {
+        if (genomes[g].type == '2D Matrix') continue
         for (var i = 0; i < chromosomes.length; i++) {
           var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
           if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
@@ -160,10 +147,6 @@ function onDocumentMouseUp(event) {
   dragging = false
 }
 
-/*
-/ handle key down
-/ to check if shift key is held down
-*/
 function onDocumentKeyDown(event) {
   if (event.shiftKey) {
     document.body.style.cursor = 'cell'
@@ -171,12 +154,6 @@ function onDocumentKeyDown(event) {
   }
 }
 
-/*
-/ handle key up
-/ handle opacity from marquee selection
-/ handle pressing enter for search
-/ handle pressing enter for entering into new navigation context
-*/
 function onDocumentKeyUp(event) {
   event.preventDefault()
   if (shifting) {
@@ -207,6 +184,7 @@ function onDocumentKeyUp(event) {
       }
       var loci = []
       for (var g = 0; g < genomes.length; g++) {
+        if (genomes[g].type == '2D Matrix') continue
         var locus = null
         for (var i = 0; i < chromosomes.length; i++) {
           if (chromosomes[i].pinned) {
@@ -224,7 +202,7 @@ function onDocumentKeyUp(event) {
         'link': 'and',
         'chromosomes': pin,
         'loci': loci,
-        'threshold': 50,
+        'threshold': 25,
         'index': navigation.length,
       })
     } else if (navigation[navigated].context == 'chromosomes') {
@@ -240,6 +218,7 @@ function onDocumentKeyUp(event) {
       }
       var loci = []
       for (var g = 0; g < genomes.length; g++) {
+        if (genomes[g].type == '2D Matrix') continue
         var locus = null
         for (var i = 0; i < nodes.length; i++) {
           if (!nodes[i].pinned) continue
@@ -269,7 +248,7 @@ function onDocumentKeyUp(event) {
         'bins': pin,
         'nodes': nin,
         'loci': loci,
-        'threshold': 50,
+        'threshold': 25,
         'root': navigation[navigated].index,
       })
     } else if (navigation[navigated].context == 'bins') {
@@ -314,7 +293,7 @@ function onDocumentKeyUp(event) {
         'bins': pin,
         'nodes': nin,
         'loci': loci,
-        'threshold': 50,
+        'threshold': 25,
         'root': navigation[navigated].root,
       })
     }

@@ -2,64 +2,64 @@
 
 var rainbow = d3.scale.category20(),
 
-    resolution = '1Mb',     // imported data resolution
-    threshold,              // graph edge threshold
-    build,                  // stores graph edges and nodes
+    resolution = '1Mb',
+    threshold,
+    build,
 
-    graph = {},             // stores data about the lefthand graph
-    linear = {},            // stores data about the bottom left 1D
+    graph = {},
+    linear = {},
     width = window.innerWidth,
     initialWidth = window.innerWidth,
     height = window.innerHeight,
     initialHeight = window.innerHeight,
-    windowRatio = 0.3,      // percent of screen allotted to lefthand graph
-    subWidth,               // width of righthand graphs, 3D viewers, and contact maps
+    windowRatio = 0.3,
+    subWidth,
 
-    all = [],               // stores all basepair bins and which chromosomes they're in
-    external = null,        // stores imported 1D data
-    loaded = [],            // stores name, min, and max of each imported 1D data value
-    genes = null,           // stores imported gene data
-    coloring = 'chromosome',// specified color coding for all views
-    genomes = [],           // stores data about each imported genome model
-    pdb = [],               // only used for preprocessing
-    segments = [],          // stores the length (bin count) of each chromosome
+    all = [],
+    external = null,
+    genes = null,
+    loaded = [],
+    coloring = 'chromosome',
+    genomes = [],
+    pdb = [],
+    hic = [],
+    segments = [],
+    rap = [],
     chromosomes = [],
     bufferGeometry = [],
 
-    pinned = 0,             // how many graph nodes are currently selected (pinned)
-    navigation = [],        // stores context history (e.g., genome, chromosome 6, bin 2)
-    navigated = 0,          // current context history index
+    pinned = 0,
+    navigation = [],
+    navigated = 0,
 
     alphabet = ['A', 'B', 'C', 'D'],
 
-    scenes = {},            // threejs scenes for each genome
-    cameras = {},           // threejs cameras for each genome
-    renderers = {},         // threejs renderers for each genome
-    controls = {},          // threejs controls for each genome
-    models = {},            // container for all 3D objects (chromosomes) in each genome
-    geometries = {},        // all threejs geometries (of chromosomes) in each genome
-    meshes = {},            // all 3D objects (chromosomes) in each genome
-    labels = {},            // keeps track of 2D labels for moving them in 3D space
-    sphere,                 // represents the outer boundary of the genome (hidden by default)
+    scenes = {},
+    cameras = {},
+    renderers = {},
+    controls = {},
+    models = {},
+    geometries = {},
+    meshes = {},
+    labels = {},
+    sphere,
     raycaster = new THREE.Raycaster(),
     mouse = new THREE.Vector2(),
     click = new THREE.Vector2(),
-    shifting = false,       // whether the user is holding shift
-    dragging = false,       // whether the user is dragging
+    shifting = false,
+    dragging = false,
 
-    zoomToBin = 8,          // determines how nodes shrink in size as the user zooms in
-    launch = true           // whether interface still needs to be initialized
+    zoomToBin = 8,
+    graphed = false,
+    launch = true
 
 var zoom = d3.behavior.zoom()
   .scaleExtent([1, 20])
   .on('zoom', zoomed)
 
-loadPDB('1Mb')
+loadData('1Mb')
 
-/*
-/ preprocesses data as described in the readme
-*/
-function loadPDB(resolution) {
+function loadData(resolution) {
   all = []
   genomes = []
   pdb = []
@@ -90,55 +90,123 @@ function loadPDB(resolution) {
     genes = []
   }
   q.awaitAll(function(error, results){
-    pdb = results[0].split('\n')
-    var chromosome = -1
-    var chr = null
-    var index = -1
-    for (var i = 0; i < pdb.length - 1; i++) {
-      var row = pdb[i].split('\t')
-      var location = row[1].split(' ')
-      if (chr != location[0].substring(3)) {
-        chromosome++
-        segments.push([index, i - 1])
-        chromosomes.push({
+    if (results[0][0] == "h") {
+      hic = results[0].split('\n')
+      var chromosome = -1
+      var chr = null
+      var index = -1
+      for (var i = 0; i < hic.length - 1; i++) {
+        var location = hic[i].substring(0, hic[i].indexOf('\t')).split('|')[2].split(':')[0].substring(3)
+        if (chr != location) {
+          chromosome++
+          segments.push([index, i - 1])
+          chromosomes.push({
+            'chromosome': chromosome,
+          })
+          index = i
+          chr = location
+        }
+        all.push({
           'chromosome': chromosome,
+          'bin': i,
         })
-        index = i
-        chr = location[0].substring(3)
+        if (genes != null) genes.push([])
       }
-      all.push({
-        'chromosome': chromosome,
-        'bin': i,
-      })
-      if (genes != null) genes.push([])
-    }
-    segments.shift()
-    segments.push([index, i - 1])
-
-    for (var r = 0; r < n; r++) {
-      pdb = results[r].split('\n')
-      var bins = []
+      segments.shift()
+      segments.push([index, i - 1])
+    } else {
+      pdb = results[0].split('\n')
+      var chromosome = -1
+      var chr = null
+      var index = -1
       for (var i = 0; i < pdb.length - 1; i++) {
         var row = pdb[i].split('\t')
-        bins.push({
-          'x': parseFloat(row[2]),
-          'y': parseFloat(row[3]),
-          'z': parseFloat(row[4]),
+        var location = row[1].split(' ')
+        if (chr != location[0].substring(3)) {
+          chromosome++
+          segments.push([index, i - 1])
+          chromosomes.push({
+            'chromosome': chromosome,
+          })
+          index = i
+          chr = location[0].substring(3)
+        }
+        all.push({
+          'chromosome': chromosome,
+          'bin': i,
+        })
+        if (genes != null) genes.push([])
+      }
+      segments.shift()
+      segments.push([index, i - 1])
+    }
+
+    for (var r = 0; r < n; r++) {
+      labels[r] = []
+      var type = ""
+      var model = ""
+      if (results[r][0] == "h") {
+        type = "2D Matrix"
+        hic = results[r].split('\n')
+        var distances = []
+        for (var i = 0; i < hic.length - 1; i++) {
+          var row = hic[i].substring(hic[i].indexOf('\t') + 1).split('\t').map(function(d){ return 10 - parseFloat(d) })
+          distances.push(row)
+        }
+        genomes.push({
+          'type': type,
+          'distances': distances,
+          'chromosomes': [],
+        })
+      } else {
+        type = "3D Structure"
+        model = "<div class='model' id='model" + r + "'></div>"
+        pdb = results[r].split('\n')
+        var bins = []
+        for (var i = 0; i < pdb.length - 1; i++) {
+          var row = pdb[i].split('\t')
+          bins.push({
+            'x': parseFloat(row[2]),
+            'y': parseFloat(row[3]),
+            'z': parseFloat(row[4]),
+          })
+        }
+        genomes.push({
+          'type': type,
+          'bins': bins,
+          'chromosomes': [],
         })
       }
-      genomes.push({
-        'bins': bins,
-        'chromosomes': [],
-      })
       $('#genomes').append(
         "<div class='genome' id='genome" + r + "'><div class='title'>STRUCT <b>" + alphabet[r]
-        + "</b><br><div class='info'>Type: Mouse Sim<br>Author: Noah</div></div><svg class='graph' id='graph"
-        + r + "'></svg><div class='model' id='model"
-        + r + "'></div><svg class='matrix' id='matrix"
-        + r + "'></svg</div>"
+        + "</b><br><div class='info'>Type: " + type + "</div></div><svg class='graph' id='graph"
+        + r + "'></svg><svg class='matrix' id='matrix"
+        + r + "'></svg>" + model + "</div>"
       )
       $('.main').append(" <b>" + alphabet[r] + "</b>")
       if (r < n - 1) $('.main').append(" &and;")
+    }
+
+    for (var i = 0; i < n; i++) {
+      var selectorA = genomes[i].distances == null ? genomes[i].bins.length : genomes[i].distances.length
+      for (var j = 0; j < n; j++) {
+        var selectorB = genomes[j].distances == null ? genomes[j].bins.length : genomes[j].distances.length
+        if (selectorA != selectorB) {
+          var split = window.location.href.split('/')
+          split.pop()
+          var url = split.join('/')
+          console.log(url)
+          if (window.confirm("The models you imported have different basepair bin counts! One has "
+            + selectorA + " bins and another has "
+            + selectorB + " bins. You need to make sure that the model bins align in order to compare them.")) {
+            window.location.href = url
+            return false
+          } else {
+            window.location.href = url
+            return false
+          }
+        }
+      }
     }
 
     subWidth = height / genomes.length
@@ -152,28 +220,127 @@ function loadPDB(resolution) {
     $('.matrix')
       .css('width', subWidth - 50)
       .css('height', subWidth - 50)
+      .mousemove(function(e){
+        var offset = $(this).position()
+        var x = e.pageX - offset.left
+        var y = e.pageY - offset.top
+        x = (x - 50) / (subWidth - 100)
+        y = (y - 50) / (subWidth - 100)
+        if (x < 0 || x > 1 || y < 0 || y > 1) return
+        var rows = parseInt($(this).attr('rows'))
+        x = parseInt(x * rows)
+        y = parseInt(y * rows)
+        d3.selectAll('.tile').attr('opacity', function(d){ return d.i != x && d.j != y ? 0.2 : 1 })
+        d3.selectAll('.node').attr('opacity', function(d,i){ return i == x || i == y ? 1 : 0.2 })
+        for (var g = 0; g < genomes.length; g++) {
+          d3.select('#graph' + g).selectAll('.node').attr('opacity', function(d,i){ return i == x || i == y ? 1 : 0.2 })
+          if (navigation[navigated].context == 'genome') {
+            if (genomes[g].type == '2D Matrix') continue
+            for (var i = 0; i < segments.length; i++) {
+              var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
+              if (i == x || i == y || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
+              else for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.2
+              geometries[g][i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+            }
+          } else {
+            var chr = navigation[navigated].chromosomes
+            for (var i = 0; i < chr.length; i++) {
+              var segment = segments[chr[i]]
+              if (genes != null) {
+                $('.gene').remove()
+                $('#navigation').append("<div class='gene'>" + genes[segment[0] + x].join("<br>") + "</div><hr class='gene'><div class='gene'>" + genes[segment[0] + y].join("<br>") + "</div>")
+              }
+              if (genomes[g].type == '2D Matrix') continue
+              var geometry = geometries[g][chr[i]]
+              var mesh = meshes[g][chr[i]]
+              var total = geometry.attributes.alpha.count
+              var bins = segment[1] - segment[0]
+              var size = parseInt(total / bins)
+              for (var j = segment[0]; j < segment[1]; j++) {
+                if (all[j].bin - segment[0] == x || all[j].bin - segment[0] == y || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
+                else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
+              }
+              geometry.attributes.alpha.needsUpdate = true
+            }
+          }
+        }
+      })
+      .mouseleave(function(e){
+        $('.gene').remove()
+        if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', 1)
+        else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
+        for (var g = 0; g < genomes.length; g++) {
+          if (genomes[g].type == '2D Matrix') continue
+          for (var i = 0; i < segments.length; i++) {
+            var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
+            if (navigation[navigated].context == 'genome') {
+              if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
+              else for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.2
+              geometries[g][i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
+            } else if (navigation[navigated].chromosomes.indexOf(i) >= 0) {
+              var segment = segments[i]
+              var geometry = geometries[g][i]
+              var mesh = meshes[g][i]
+              var total = geometry.attributes.alpha.count
+              var bins = segment[1] - segment[0]
+              var size = parseInt(total / bins)
+              for (var j = segment[0]; j < segment[1]; j++) {
+                if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
+                else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
+              }
+              geometry.attributes.alpha.needsUpdate = true
+            }
+          }
+        }
+      })
 
+    // calculate average chromosome positions:
     for (var g = 0; g < genomes.length; g++) {
       var genome = genomes[g]
-      for (var i = 0; i < segments.length; i++) {
-        var segment = segments[i]
-        var x = 0
-        var y = 0
-        var z = 0
-        for (var s = segment[0]; s < segment[1]; s++) {
-          x += genome.bins[s].x
-          y += genome.bins[s].y
-          z += genome.bins[s].z
+      if (genome.type == '2D Matrix') {
+        for (var i = 0; i < segments.length; i++) {
+          var distances = []
+          for (var j = 0; j < segments.length; j++) {
+            if (i == j) {
+              distances.push(0)
+              continue
+            }
+            var segmentA = segments[i]
+            var segmentB = segments[j]
+            for (var s = segmentA[0]; s < segmentA[1]; s++) {
+              var distance = 0
+              for (var d = segmentB[0]; d < segmentB[1]; d++) {
+                distance += genome.distances[s][d]
+              }
+            }
+            distance /= 20
+            distances.push(distance)
+          }
+          genome.chromosomes.push({
+            distances
+          })
         }
-        var bins = segment[1] - segment[0]
-        x /= bins
-        y /= bins
-        z /= bins
-        genome.chromosomes.push({
-          'x': x,
-          'y': y,
-          'z': z,
-        })
+      } else if (genome.type == '3D Structure') {
+        for (var i = 0; i < segments.length; i++) {
+          var segment = segments[i]
+          var x = 0
+          var y = 0
+          var z = 0
+          for (var s = segment[0]; s < segment[1]; s++) {
+            x += genome.bins[s].x
+            y += genome.bins[s].y
+            z += genome.bins[s].z
+          }
+          var bins = segment[1] - segment[0]
+          x /= bins
+          y /= bins
+          z /= bins
+          genome.chromosomes.push({
+            'x': x,
+            'y': y,
+            'z': z,
+          })
+        }
       }
     }
 
@@ -214,8 +381,9 @@ function loadPDB(resolution) {
           chromosome++
           chr = row[0]
         }
-        var bin = Math.round(parseInt(row[1].split('-')[0]) / 1000000)
+        var bin = Math.floor(parseInt(row[1].split('-')[0]) / 1000000)
         bin += segments[chromosome][0]
+        if (genes[bin] == null) break
         genes[bin].push(row[3])
         if (genes[bin + segments[parseInt((segments.length) / 2)][1] - 1] != null) genes[bin + segments[parseInt((segments.length) / 2)][1] - 1].push(row[3]) // TODO
       }
@@ -228,9 +396,6 @@ function loadPDB(resolution) {
   })
 }
 
-/*
-/ initialize 3D viewers and interactions
-*/
 function init() {
   launch = false
 
@@ -255,7 +420,9 @@ function init() {
     .attr('width', width * windowRatio)
     .attr('height', 100)
 
+
   for (var g = 0; g < genomes.length; g++) {
+    if (genomes[g].type == '2D Matrix') continue
     scenes[g] = new THREE.Scene()
     cameras[g] = new THREE.PerspectiveCamera(75, 1, 1, 20000)
     renderers[g] = new THREE.WebGLRenderer({ alpha: true })
@@ -329,84 +496,8 @@ function init() {
   $('#data').on('change', function(event) {
     setColor(event.target.value)
   })
-
-  $('.matrix')
-    .mousemove(function(e){
-      var offset = $(this).position()
-      var x = e.pageX - offset.left
-      var y = e.pageY - offset.top
-      x = (x - 50) / (subWidth - 100)
-      y = (y - 50) / (subWidth - 100)
-      if (x < 0 || x > 1 || y < 0 || y > 1) return
-      var rows = parseInt($(this).attr('rows'))
-      x = parseInt(x * rows)
-      y = parseInt(y * rows)
-      d3.selectAll('.tile').attr('opacity', function(d){ return d.i != x && d.j != y ? 0.2 : 1 })
-      d3.selectAll('.node').attr('opacity', function(d,i){ return i == x || i == y ? 1 : 0.2 })
-      for (var g = 0; g < genomes.length; g++) {
-        d3.select('#graph' + g).selectAll('.node').attr('opacity', function(d,i){ return i == x || i == y ? 1 : 0.2 })
-        if (navigation[navigated].context == 'genome') {
-          for (var i = 0; i < segments.length; i++) {
-            var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
-            if (i == x || i == y || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
-            else for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.2
-            geometries[g][i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
-          }
-        } else {
-          var chr = navigation[navigated].chromosomes
-          for (var i = 0; i < chr.length; i++) {
-            var segment = segments[chr[i]]
-            var geometry = geometries[g][chr[i]]
-            var mesh = meshes[g][chr[i]]
-            var total = geometry.attributes.alpha.count
-            var bins = segment[1] - segment[0]
-            var size = parseInt(total / bins)
-            if (genes != null) {
-              $('.gene').remove()
-              $('#navigation').append("<div class='gene'>" + genes[segment[0] + x].join("<br>") + "</div><hr class='gene'><div class='gene'>" + genes[segment[0] + y].join("<br>") + "</div>")
-            }
-            for (var j = segment[0]; j < segment[1]; j++) {
-              if (all[j].bin - segment[0] == x || all[j].bin - segment[0] == y || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
-              else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
-            }
-            geometry.attributes.alpha.needsUpdate = true
-          }
-        }
-      }
-    })
-    .mouseleave(function(e){
-      $('.gene').remove()
-      if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', 1)
-      else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
-      for (var g = 0; g < genomes.length; g++) {
-        for (var i = 0; i < segments.length; i++) {
-          var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
-          if (navigation[navigated].context == 'genome') {
-            if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
-            else for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.2
-            geometries[g][i].attributes.alpha = new THREE.BufferAttribute(alphas, 1)
-          } else if (navigation[navigated].chromosomes.indexOf(i) >= 0) {
-            var segment = segments[i]
-            var geometry = geometries[g][i]
-            var mesh = meshes[g][i]
-            var total = geometry.attributes.alpha.count
-            var bins = segment[1] - segment[0]
-            var size = parseInt(total / bins)
-            for (var j = segment[0]; j < segment[1]; j++) {
-              if (pinned == 0 || all[j].pinned) for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.8
-              else for (var k = (j - segment[0]) * size; k < (j + 1 - segment[0]) * size; k++) geometry.attributes.alpha.array[k] = 0.2
-            }
-            geometry.attributes.alpha.needsUpdate = true
-          }
-        }
-      }
-    })
 }
 
-/*
-/ navigate to a particular context (i.e., genome, chromosomes, bins)
-/ and update the display
-*/
 function navigate(nav) {
   $('#navigation>.nav').addClass('inactive')
   $('#navigation>.nav:eq(' + nav + ')').removeClass('inactive')
@@ -416,6 +507,7 @@ function navigate(nav) {
   threshold /= navigation[nav].context == 'genome' ? 1 : 5
 
   for (var g = 0; g < genomes.length; g++) {
+    if (genomes[g].type == '2D Matrix') continue
     controls[g].target.copy(navigation[nav].loci[g])
     cameras[g].position.copy(navigation[nav].loci[g])
     if (navigation[nav].context == 'genome') cameras[g].position.set(11, 11, 11)
@@ -426,7 +518,9 @@ function navigate(nav) {
   if (navigation[nav].context == 'genome') {
     graphGenome()
     alphaModel(0.8)
+    graph.chromosome = null
     linear.svg.selectAll('.chromosome').remove()
+    $('.label').remove()
     $('#unpin').css('visibility', 'hidden')
   } else if (navigation[nav].context == 'chromosomes') {
     if (navigation[navigated].chromosomes != navigation[nav].chromosomes) graphChromosomes(navigation[nav].chromosomes)
@@ -458,9 +552,6 @@ function navigate(nav) {
   if (coloring != 'chromosome') setColor(coloring)
 }
 
-/*
-/ set the color coding for all interface views
-*/
 function setColor(value) {
   var colors = []
   if (value == "chromosome") {
@@ -472,6 +563,7 @@ function setColor(value) {
       })
     }
   for (var g = 0; g < genomes.length; g++) {
+    if (genomes[g].type == '2D Matrix') continue
     for (var j = 0; j < chromosomes.length; j++) {
       var i = chromosomes[j].chromosome
       var total = geometries[g][i].attributes.position.count
@@ -510,9 +602,6 @@ function setColor(value) {
   coloring = value
 }
 
-/*
-/ search for genes and add labels for any found
-*/
 function search(query) {
   $('#search').val("")
   $('.label').remove()
@@ -529,13 +618,10 @@ function search(query) {
   }
 }
 
-/*
-/ add labels to all interface views
-*/
 function addLabel(text, chromosome, bin) {
   for (var g = 0; g < genomes.length; g++) {
     var element = $("<div class='label'>" + text + "</div>").css({'color': rainbow(chromosome)})
-    labels[g].push({
+    if (genomes[g].type == '3D Structure') labels[g].push({
       'element': element,
       'position': genomes[g].bins[bin],
     })
@@ -564,12 +650,10 @@ function addLabel(text, chromosome, bin) {
     .attr('class', 'label')
 }
 
-/*
-/ translate 3D coordinates into a 3D model in a 3D view
-*/
 function modelGenome() {
 
   for (var g = 0; g < genomes.length; g++) {
+    if (genomes[g].type == '2D Matrix') continue
     scenes[g].remove(models[g])
     models[g] = new THREE.Object3D()
 
@@ -621,9 +705,6 @@ function modelGenome() {
 
 }
 
-/*
-/ determine the edges in the genome graph and display them
-*/
 function linkGenome(nodes) {
   graph.svg.selectAll('.link').remove()
   var links = []
@@ -638,7 +719,9 @@ function linkGenome(nodes) {
       var sum = 0
       var passed = true
       for (var g = 0; g < genomes.length; g++) {
-        var distance = distanceToSquared(genomes[g].chromosomes[i].x, genomes[g].chromosomes[i].y, genomes[g].chromosomes[i].z, genomes[g].chromosomes[j].x, genomes[g].chromosomes[j].y, genomes[g].chromosomes[j].z)
+        var distance = genomes[g].type == '2D Matrix'
+          ? genomes[g].chromosomes[i].distances[j]
+          : distanceToSquared(genomes[g].chromosomes[i].x, genomes[g].chromosomes[i].y, genomes[g].chromosomes[i].z, genomes[g].chromosomes[j].x, genomes[g].chromosomes[j].y, genomes[g].chromosomes[j].z)
         passes.push(distance < threshold)
         distances.push(distance)
         sum += distance
@@ -676,9 +759,6 @@ function linkGenome(nodes) {
   return [nodes, links, others]
 }
 
-/*
-/ create the genome graph
-*/
 function graphGenome() {
   graph.svg.selectAll('.node,.link').remove()
   pinned = 0
@@ -717,6 +797,7 @@ function graphGenome() {
     d3.select(this).attr('opacity', 1)
     d3.selectAll('.node' + d.chromosome).attr('opacity', 1)
     for (var g = 0; g < genomes.length; g++) {
+      if (genomes[g].type == '2D Matrix') continue
       for (var i = 0; i < segments.length; i++) {
         var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
         if (i == d.chromosome || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
@@ -737,6 +818,7 @@ function graphGenome() {
     if (pinned == 0) d3.selectAll('.node,.tile').attr('opacity', 1)
     else d3.selectAll('.node,.tile').attr('opacity', function(d,i){ return d.pinned ? 1 : 0.2 })
     for (var g = 0; g < genomes.length; g++) {
+      if (genomes[g].type == '2D Matrix') continue
       for (var i = 0; i < segments.length; i++) {
         var alphas = new Float32Array(geometries[g][i].attributes.alpha.count)
         if (pinned == 0 || chromosomes[i].pinned) for (var a = 0; a < geometries[g][i].attributes.alpha.count; a++) alphas[a] = 0.8
@@ -868,13 +950,19 @@ function updateRows(nodes, links, keep) {
     if (keep == null) {
       for (var i = 0; i < nodes.length; i++) {
         for (var j = 0; j < nodes.length; j++) {
-          tiles.push({'chromosome': nodes[i].chromosome, 'i': i, 'j': j, 'distance': distanceToSquared(elements[nodes[i][selector]].x, elements[nodes[i][selector]].y, elements[nodes[i][selector]].z, elements[nodes[j][selector]].x, elements[nodes[j][selector]].y, elements[nodes[j][selector]].z) })
+          var distance = genomes[g].type == '2D Matrix'
+            ? selector == 'bin' ? genomes[g].distances[nodes[i].bin][nodes[j].bin] : genomes[g].chromosomes[nodes[i].chromosome].distances[nodes[j].chromosome]
+            : distanceToSquared(elements[nodes[i][selector]].x, elements[nodes[i][selector]].y, elements[nodes[i][selector]].z, elements[nodes[j][selector]].x, elements[nodes[j][selector]].y, elements[nodes[j][selector]].z)
+          tiles.push({'chromosome': nodes[i].chromosome, 'i': i, 'j': j, 'distance': distance })
         }
       }
     } else {
       for (var i = 0; i < keep.length; i++) {
         for (var j = 0; j < keep.length; j++) {
-          tiles.push({'chromosome': nodes[keep[i]].chromosome, 'i': i, 'j': j, 'distance': distanceToSquared(elements[nodes[keep[i]][selector]].x, elements[nodes[keep[i]][selector]].y, elements[nodes[keep[i]][selector]].z, elements[nodes[keep[j]][selector]].x, elements[nodes[keep[j]][selector]].y, elements[nodes[keep[j]][selector]].z) })
+          var distance = genomes[g].type == '2D Matrix'
+            ? selector == 'bin' ? genomes[g].distances[nodes[i].bin][nodes[j].bin] : genomes[g].chromosomes[nodes[i].chromosome].distances[nodes[j].chromosome]
+            : distanceToSquared(elements[nodes[keep[i]][selector]].x, elements[nodes[keep[i]][selector]].y, elements[nodes[keep[i]][selector]].z, elements[nodes[keep[j]][selector]].x, elements[nodes[keep[j]][selector]].y, elements[nodes[keep[j]][selector]].z)
+          tiles.push({'chromosome': nodes[keep[i]].chromosome, 'i': i, 'j': j, 'distance': distance })
         }
       }
     }
@@ -905,9 +993,6 @@ function updateRows(nodes, links, keep) {
   }
 }
 
-/*
-/ determine the edges in the chromosomes graph and display them
-*/
 function linkChromosomes(nodes) {
   graph.svg.selectAll('.link').remove()
   var links = []
@@ -924,7 +1009,9 @@ function linkChromosomes(nodes) {
       var sum = 0
       var passed = true
       for (var g = 0; g < genomes.length; g++) {
-        var distance = distanceToSquared(genomes[g].bins[bin.bin].x, genomes[g].bins[bin.bin].y, genomes[g].bins[bin.bin].z, genomes[g].bins[nodes[j].bin].x, genomes[g].bins[nodes[j].bin].y, genomes[g].bins[nodes[j].bin].z)
+        var distance = genomes[g].type == '2D Matrix'
+          ? genomes[g].distances[i][j]
+          : distanceToSquared(genomes[g].bins[bin.bin].x, genomes[g].bins[bin.bin].y, genomes[g].bins[bin.bin].z, genomes[g].bins[nodes[j].bin].x, genomes[g].bins[nodes[j].bin].y, genomes[g].bins[nodes[j].bin].z)
         passes.push(distance < threshold)
         distances.push(distance)
         sum += distance
@@ -963,9 +1050,6 @@ function linkChromosomes(nodes) {
   return [nodes, links, others]
 }
 
-/* create the chromosomes graph:
-/ chr: chromosomes to include
-*/
 function graphChromosomes(chr) {
   graph.svg.selectAll('.node,.link,.chromosome').remove()
   pinned = 0
@@ -973,11 +1057,12 @@ function graphChromosomes(chr) {
 
   linear.svg.selectAll('.highlight').attr('fill', '#444').classed('active', false)
 
+  graphed = true
   var cg = graph.chromosomes = {}
   cg.force = d3.layout.force()
     .size([width * windowRatio, height])
     .linkDistance(function(d){ return d.distance / 10 })
-    .linkStrength(function(d){ return d.physical < 0 ? 0.5 : 1 })
+    .linkStrength(function(d){ return d.physical < 0 ? 0.1 : 1 })
     .charge(-30)
   cg.nodes = []
   cg.nodesDict = {}
@@ -1056,6 +1141,7 @@ function graphChromosomes(chr) {
     }
     if (genes != null) $('#navigation').append("<div class='gene'>" + genes[d.bin].join("<br>") + "</div>")
     for (var g = 0; g < genomes.length; g++) {
+      if (genomes[g].type == '2D Matrix') continue
       for (var i = 0; i < chr.length; i++) {
         var segment = segments[chr[i]]
         var geometry = geometries[g][chr[i]]
@@ -1094,6 +1180,7 @@ function graphChromosomes(chr) {
     d3.select(this).selectAll('.tooltip').remove()
     $('.gene').remove()
     for (var g = 0; g < genomes.length; g++) {
+      if (genomes[g].type == '2D Matrix') continue
       for (var i = 0; i < chr.length; i++) {
         var segment = segments[chr[i]]
         var geometry = geometries[g][chr[i]]
@@ -1211,21 +1298,34 @@ function graphChromosomes(chr) {
   }
 }
 
-/*
-/ threejs animate function
-*/
 function animate() {
   requestAnimationFrame(animate)
-  for (var g = 0; g < genomes.length; g++) controls[g].update()
+  for (var g = 0; g < genomes.length; g++) {
+    if (genomes[g].type == '2D Matrix') continue
+    controls[g].update()
+  }
   render()
 }
 
-/*
-/ threejs render function
-/ updates any added labels
-*/
+function toScreenPosition(position, g) {
+  var vector = new THREE.Vector3()
+  var widthHalf = 0.5 * renderers[g].context.canvas.width
+  var heightHalf = 0.5 * renderers[g].context.canvas.height
+  // obj.updateMatrixWorld()
+  // vector.setFromMatrixPosition(obj.matrixWorld)
+  vector.set(position.x, position.y, position.z)
+  vector.project(cameras[g])
+  vector.x = (vector.x * widthHalf) + widthHalf
+  vector.y = -(vector.y * heightHalf) + heightHalf
+  return {
+    x: vector.x,
+    y: vector.y
+  }
+}
+
 function render() {
   for (var g = 0; g < genomes.length; g++) {
+    if (genomes[g].type == '2D Matrix') continue
     for (var i = 0; i < labels[g].length; i++) {
       var position = toScreenPosition(labels[g][i].position, g)
       labels[g][i].element.css({

@@ -1,27 +1,5 @@
 'use strict'
 
-/*
-/ convert 3D to 2D, useful for positioning 2D labels on 3D space
-*/
-function toScreenPosition(position, g) {
-  var vector = new THREE.Vector3()
-  var widthHalf = 0.5 * renderers[g].context.canvas.width
-  var heightHalf = 0.5 * renderers[g].context.canvas.height
-  // obj.updateMatrixWorld()
-  // vector.setFromMatrixPosition(obj.matrixWorld)
-  vector.set(position.x, position.y, position.z)
-  vector.project(cameras[g])
-  vector.x = (vector.x * widthHalf) + widthHalf
-  vector.y = -(vector.y * heightHalf) + heightHalf
-  return {
-    x: vector.x,
-    y: vector.y
-  }
-}
-
-/*
-/ draw a crosshait on a contact map, currently unused
-*/
 function drawCrosshair(g, index, center) {
   var submatrix = d3.select('#matrix' + g)
   var push = center ? 25 + submatrix.attr('size') / 2 : 25
@@ -43,12 +21,10 @@ function drawCrosshair(g, index, center) {
     .attr('class', 'crosshair')
 }
 
-/*
-/ use the graph's pinned values to set the opacity of the 3D models
-*/
 function alphaModelFromGraph(max) {
   var chr = graph.chromosomes.chr
   for (var g = 0; g < genomes.length; g++) {
+    if (genomes[g].type == '2D Matrix') continue
     for (var i = 0; i < chr.length; i++) {
       var segment = segments[chr[i]]
       var geometry = geometries[g][chr[i]]
@@ -66,12 +42,9 @@ function alphaModelFromGraph(max) {
   }
 }
 
-/* set the opacity of the 3D models
-/ alpha: opacity
-/ visible: show these chromosomes but keep all other invisible
-*/
 function alphaModel(alpha, visible) {
   for (var g = 0; g < genomes.length; g++) {
+    if (genomes[g].type == '2D Matrix') continue
     for (var i = 0; i < chromosomes.length; i++) {
       if (visible != null && visible.indexOf(i) == -1) meshes[g][i].visible = false
       else {
@@ -84,9 +57,6 @@ function alphaModel(alpha, visible) {
   }
 }
 
-/*
-/ hotlink to the UCSC genome browser
-*/
 function lookup(chromosome, bins) {
   var prefix = 'https://genome.ucsc.edu/cgi-bin/hgTracks?db=mm10&lastVirtModeType=default&lastVirtModeExtraState=&virtModeType=default&virtMode=0&nonVirtPosition=&position='
   var suffix = '&hgsid=501888851_Vr81OkrPRrUhSo3kt4U7ITltFimU'
@@ -95,38 +65,23 @@ function lookup(chromosome, bins) {
   window.focus()
 }
 
-/*
-/ distance function
-*/
 function distanceToSquared(x1, y1, z1, x2, y2, z2) {
   return Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2) + Math.pow(z2 - z1, 2)
 }
 
-/*
-/ return the value only if it's greater than least
-*/
 function atLeast(value, least) {
   return value > least ? value : least
 }
 
-/*
-/ convert the chromosome index to its name
-*/
 function chromosomeName(index) {
   return (index % 20) == 19 ? "X" : (index % 20) + 1
 }
 
-/*
-/ handle panning and zooming the graph (panning has been disabled)
-*/
 function zoomed() {
   graph.container.selectAll('.node').selectAll('circle,text').attr('transform', 'scale(' + (((zoomToBin + 2) - d3.event.scale) / (zoomToBin + 1)) + ')')
   graph.container.attr('transform', 'translate(' + d3.event.translate + ')scale(' + d3.event.scale + ')')
 }
 
-/*
-/ color a certain bin in the 3D models
-*/
 function colorBin(chromosome, bin, color) {
   for (var g = 0; g < genomes.length; g++) {
     var total = geometries[g][chromosome].attributes.position.count
@@ -141,9 +96,6 @@ function colorBin(chromosome, bin, color) {
   }
 }
 
-/*
-/ set the opacity of a certain bin on the 3D models
-*/
 function alphaBin(chromosome, bin, alpha) {
   for (var g = 0; g < genomes.length; g++) {
     var total = geometries[g][chromosome].attributes.alpha.count
@@ -156,9 +108,6 @@ function alphaBin(chromosome, bin, alpha) {
   }
 }
 
-/*
-/ convert mouse position to graph coordinate space (skewed by zooming)
-*/
 function makeAbsoluteContext(element, svgDocument) {
   return function(x,y) {
     var offset = svgDocument.getBoundingClientRect()

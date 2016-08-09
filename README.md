@@ -2,10 +2,12 @@
 
 1. Install Node.js from [its website](http://nodejs.org).
 1. Clone this repository:
+
   ```
   git clone http://github.com/petepolack/3ddna
   ```
 1. Initialize Node in that directory:
+
   ```
   cd 3ddna
   npm install
@@ -20,8 +22,6 @@
 1. Once one or more chromosomes or bins are selected, press the `Enter` key to zoom in on them.
 
 ## Developer Notes
-
-*The graph representation does not play well with low-resolution experimental data (like at 1Mb). The reason being that distances between parallel DNA strands (e.g., sides of a TAD) are often closer than adjacent basepair bins!*
 
 Going forward, we want to be able to support importing data at multiple **resolutions** (e.g., 1Mb, 200kb, 40kb) as well as from multiple **data types** (e.g., 3D structures, 2D matrices). Although we can currently import any one of these formats and compare them to others, the interface should support switching between these types flexibly. In some instances, even, these types should be combined; for example, when the same model is represented both by 2D and 3D data.
 
@@ -48,6 +48,7 @@ As said, this allows for the importing of multiple datasets and comparing them s
 
 1. Don't store imported data in memory.
 1. When the user loads the interface, make a request for the highest-level data of each genome model. For example, if two genome models have been imported, one from a 2D contact map and another from a 3D structure, issue the following requests:
+
   ```
   /genome/2d/1
   /genome/3d/2
@@ -56,13 +57,15 @@ As said, this allows for the importing of multiple datasets and comparing them s
     * If the user requests 3D data from the former 2D model like with `/genome/3d/1`, this may be impossible, so the interface need only return an error.
     * On the other hand, if the user requests 2D data from the latter 3D model like with `/genome/2d/2`, this is a simple conversion that back-end processing could handle and return.
     * *Of course, in the future, it may be possible to derive 3D coordinates from 2D data.*
-1. When the user chooses to navigate to chromosome 6, issue the following requests;
+1. When the user chooses to navigate to chromosome 6, issue the following requests:
+
   ```
   /genome/2d/1/6
   /genome/3d/2/6
   ```
   Which will return the bin positions for both models (therefore allowing them to be plotted in their respective graph, 3D viewer, and contact map).
 1. When the user chooses to see this chromosome 6 at a higher resolution, say 200kb, issue the following requests:
+
   ```
   /genome/2d/1/6/200
   /genome/3d/2/6/200

@@ -4,6 +4,8 @@ var app = express()
 var stylus = require('stylus')
 var multer = require('multer')
 var upload = multer({dest: 'public/uploads/'})
+var fs = require('fs')
+var glob = require('glob')
 
 // compile .styl files into .css with stylus
 function compile(str, path) {
@@ -53,6 +55,16 @@ app.post('/load3D', upload.any(), function(req, res) {
   })
   res.redirect('/interface')
   res.status(204).end()
+})
+
+// delete all files imported to uploads
+app.post('/deleteUploads', function(req, res) {
+  glob('./public/uploads/*', function(error, files) {
+    if (error) throw error
+    files.forEach(function(item, index, array) {
+      fs.unlink(item, function(error) { if (error) throw error })
+    })
+  })
 })
 
 // listen on port 5000 for connections

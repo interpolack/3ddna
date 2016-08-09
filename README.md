@@ -25,7 +25,7 @@
 
 Going forward, we want to be able to support importing data at multiple **resolutions** (e.g., 1Mb, 200kb, 40kb) as well as from multiple **data types** (e.g., 3D structures, 2D matrices). Although we can currently import any one of these formats and compare them to others, the interface should support switching between these types flexibly. In some instances, even, these types should be combined; for example, when the same model is represented both by 2D and 3D data.
 
-The current data preprocessing pipeline is as follows, which all occurs in the `loadPDB()` function:
+The current data preprocessing pipeline is as follows, which all occurs in the `loadData()` function:
 
 1. Store imported data in the `results` array.
 1. Use Model A (at `results[0]`) to determine:

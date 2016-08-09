@@ -321,6 +321,7 @@ function loadData(resolution) {
     graphGenome()
     modelGenome()
     animate()
+    $.post('/deleteUploads')
   })
 }
 

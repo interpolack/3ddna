@@ -186,6 +186,28 @@ function loadData(resolution) {
       if (r < n - 1) $('.main').append(" &and;")
     }
 
+    for (var i = 0; i < n; i++) {
+      var selectorA = genomes[i].distances == null ? genomes[i].bins.length : genomes[i].distances.length
+      for (var j = 0; j < n; j++) {
+        var selectorB = genomes[j].distances == null ? genomes[j].bins.length : genomes[j].distances.length
+        if (selectorA != selectorB) {
+          var split = window.location.href.split('/')
+          split.pop()
+          var url = split.join('/')
+          console.log(url)
+          if (window.confirm("The models you imported have different basepair bin counts! One has "
+            + selectorA + " bins and another has "
+            + selectorB + " bins. You need to make sure that the model bins align in order to compare them.")) {
+            window.location.href = url
+            return false
+          } else {
+            window.location.href = url
+            return false
+          }
+        }
+      }
+    }
+
     subWidth = height / genomes.length
     $('.genome')
       .css('height', subWidth)
@@ -271,7 +293,7 @@ function loadData(resolution) {
         }
       })
 
-    // calculate average chromosomes positions:
+    // calculate average chromosome positions:
     for (var g = 0; g < genomes.length; g++) {
       var genome = genomes[g]
       if (genome.type == '2D Matrix') {

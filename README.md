@@ -15,7 +15,7 @@
   ```
 1. Point your browser to [port 5000](localhost:5000).
 1. Load in data from `data/`:
-  * 3D structures: `data/structure_n`
+  * 3D genome data `data/structure_n` or 2D genome data `data/hic_giant_zscore.txt`
   * External data: `data/data.tsv`, which has been compiled from multiple sources with `preprocess.py`.
   * Gene data: `data/mouse_genes.txt`
 1. Launch the interface by clicking `Load`.

@@ -13,10 +13,11 @@
   ```
 1. Point your browser to [port 5000](localhost:5000).
 1. Load in data from `data/`:
-  * 3D structures: `data/structure_1`
-  * External data: `data/data.tsv`
+  * 3D structures: `data/structure_n`
+  * External data: `data/data.tsv`, which has been compiled from multiple sources with `preprocess.py`.
   * Gene data: `data/mouse_genes.txt`
 1. Launch the interface by clicking `Load`.
+1. Once one or more chromosomes or bins are selected, press the `Enter` key to zoom in on them.
 
 ## Developer Notes
 
@@ -52,6 +53,9 @@ As said, this allows for the importing of multiple datasets and comparing them s
   /genome/3d/2
   ```
   Which will return the average chromosome positions for both models (therefore allowing them to be plotted in their respective graph, 3D viewer, and contact map).
+    * If the user requests 3D data from the former 2D model like with `/genome/3d/1`, this may be impossible, so the interface need only return an error.
+    * On the other hand, if the user requests 2D data from the latter 3D model like with `/genome/2d/2`, this is a simple conversion that back-end processing could handle and return.
+    * *Of course, in the future, it may be possible to derive 3D coordinates from 2D data.*
 1. When the user chooses to navigate to chromosome 6, issue the following requests;
   ```
   /genome/2d/1/6
@@ -63,6 +67,7 @@ As said, this allows for the importing of multiple datasets and comparing them s
   /genome/2d/1/6/200
   /genome/3d/2/6/200
   ```
+  * Foreseeably, instead of needing to import higher-resolution data manually, the back-end can just downsample from a higher resolution (e.g., import 40kb data and downsample to 200kb and 1Mb)
 1. When the user chooses to navigate to some selected bins on this chromosome, just use the above requests and filter out the irrelevant data.
 
 This allows data to be processed on and retrieved from the back-end, as opposed to doing all preprocessing at launch as in the current prototype.

@@ -1,3 +1,6 @@
+/*
+/ handle resize
+*/
 function onWindowResize() {
   width = window.innerWidth
   height = window.innerHeight
@@ -5,10 +8,14 @@ function onWindowResize() {
   graph.svg.attr('width', width * windowRatio).attr('height', height)
   linear.svg.attr('width', width * windowRatio)
   linear.svg.line.attr('width', (width * windowRatio) - 50)
-  // camera.updateProjectionMatrix()
   for (var g = 0; g < genomes.length; g++) renderers[g].setSize(subWidth - 50, subWidth - 50)
 }
 
+/*
+/ handle mouse move
+/ handle marquee selection opacity
+/ handle 3D bin selection functionality
+*/
 function onDocumentMouseMove(event, g) {
 
   document.body.style.cursor = 'default'
@@ -60,6 +67,10 @@ function onDocumentMouseMove(event, g) {
   }
 }
 
+/*
+/ handle mouse down
+/ handle marquee update
+*/
 function onDocumentMouseDown(event) {
   graph.marquee = graph.svg.append('rect')
     .attr('rx', 2)
@@ -74,6 +85,10 @@ function onDocumentMouseDown(event) {
   dragging = true
 }
 
+/*
+/ handle mouse up
+/ handle marquee selection functionality
+*/
 function onDocumentMouseUp(event) {
   if (!shifting && dragging && click.x != event.clientX && click.y != event.clientY) {
     var a = {'x': click.x, 'y': click.y}
@@ -145,6 +160,10 @@ function onDocumentMouseUp(event) {
   dragging = false
 }
 
+/*
+/ handle key down
+/ to check if shift key is held down
+*/
 function onDocumentKeyDown(event) {
   if (event.shiftKey) {
     document.body.style.cursor = 'cell'
@@ -152,6 +171,12 @@ function onDocumentKeyDown(event) {
   }
 }
 
+/*
+/ handle key up
+/ handle opacity from marquee selection
+/ handle pressing enter for search
+/ handle pressing enter for entering into new navigation context
+*/
 function onDocumentKeyUp(event) {
   event.preventDefault()
   if (shifting) {

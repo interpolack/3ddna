@@ -36,15 +36,16 @@ function onDocumentMouseMove(event, g) {
   mouse.x = (x / (subWidth - 50)) * 2 - 1
   mouse.y = -(y / (subWidth - 50)) * 2 + 1
 
-  raycaster.setFromCamera(mouse, cameras[0])
-  var intersections = raycaster.intersectObjects(models[0].children)
+  // TODO get appropriate 3D model target, or else only the first 3D viewer will allow 3D selections
+  raycaster.setFromCamera(mouse, cameras[0]) // here
+  var intersections = raycaster.intersectObjects(models[0].children) // here
   var intersection = intersections.length > 0 ? intersections[0] : null
 
   if (shifting && intersection !== null && intersection.object.visible && intersection.object.name !== "") {
     if (pinned == 0 && navigation[navigated].context == 'chromosomes') {
       var chromosome = intersection.object.name
       var faceIndex = intersection.faceIndex
-      var total = geometries[0][chromosome].attributes.alpha.count // TODO 0 indexing only could be dangerous
+      var total = geometries[0][chromosome].attributes.alpha.count // here
       var bins = segments[chromosome][1] - segments[chromosome][0]
       var bin = parseInt(faceIndex / total * bins)
       alphaModel(0.2, navigation[navigated].chromosomes)

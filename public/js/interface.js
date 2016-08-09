@@ -95,26 +95,25 @@ function loadData(resolution) {
       var chromosome = -1
       var chr = null
       var index = -1
-      for (var i = 0; i < hic.length - 1; i+=2) {
-        var bin = hic[i]
-        var location = bin.split('|')[2].split(':')[0].substring(3)
+      for (var i = 0; i < hic.length - 1; i++) {
+        var location = hic[i].substring(0, hic[i].indexOf('\t')).split('|')[2].split(':')[0].substring(3)
         if (chr != location) {
           chromosome++
-          segments.push([index, (i / 2) - 1])
+          segments.push([index, i - 1])
           chromosomes.push({
             'chromosome': chromosome,
           })
-          index = i / 2
+          index = i
           chr = location
         }
         all.push({
           'chromosome': chromosome,
-          'bin': i / 2,
+          'bin': i,
         })
         if (genes != null) genes.push([])
       }
       segments.shift()
-      segments.push([index, (i / 2) - 1])
+      segments.push([index, i - 1])
     } else {
       pdb = results[0].split('\n')
       var chromosome = -1
@@ -149,9 +148,8 @@ function loadData(resolution) {
         type = "2D Matrix"
         hic = results[r].split('\n')
         var distances = []
-        for (var i = 0; i < hic.length - 1; i+=2) {
-          var row = hic[i+1].split('\t').map(function(d){ return parseFloat(d) + 1 })
-          row.shift()
+        for (var i = 0; i < hic.length - 1; i++) {
+          var row = hic[i].substring(hic[i].indexOf('\t') + 1).split('\t').map(function(d){ return 10 - parseFloat(d) })
           distances.push(row)
         }
         genomes.push({
@@ -182,7 +180,7 @@ function loadData(resolution) {
         "<div class='genome' id='genome" + r + "'><div class='title'>STRUCT <b>" + alphabet[r]
         + "</b><br><div class='info'>Type: " + type + "</div></div><svg class='graph' id='graph"
         + r + "'></svg><svg class='matrix' id='matrix"
-        + r + "'></svg</div>"
+        + r + "'></svg>" + model + "</div>"
       )
       $('.main').append(" <b>" + alphabet[r] + "</b>")
       if (r < n - 1) $('.main').append(" &and;")
@@ -291,6 +289,7 @@ function loadData(resolution) {
               for (var d = segmentB[0]; d < segmentB[1]; d++) {
                 distance += genome.distances[s][d]
               }
+              distance /= (segmentB[1] - segmentB[0])
             }
             distances.push(distance)
           }
@@ -927,7 +926,7 @@ function updateRows(nodes, links, keep) {
       for (var i = 0; i < nodes.length; i++) {
         for (var j = 0; j < nodes.length; j++) {
           var distance = genomes[g].type == '2D Matrix'
-            ? genomes[g].distances[nodes[i].bin][nodes[j].bin]
+            ? selector == 'bin' ? genomes[g].distances[nodes[i].bin][nodes[j].bin] : genomes[g].chromosomes[nodes[i].chromosome].distances[nodes[j].chromosome]
             : distanceToSquared(elements[nodes[i][selector]].x, elements[nodes[i][selector]].y, elements[nodes[i][selector]].z, elements[nodes[j][selector]].x, elements[nodes[j][selector]].y, elements[nodes[j][selector]].z)
           tiles.push({'chromosome': nodes[i].chromosome, 'i': i, 'j': j, 'distance': distance })
         }
@@ -936,7 +935,7 @@ function updateRows(nodes, links, keep) {
       for (var i = 0; i < keep.length; i++) {
         for (var j = 0; j < keep.length; j++) {
           var distance = genomes[g].type == '2D Matrix'
-            ? genomes[g].distances[nodes[i].bin][nodes[j].bin]
+            ? selector == 'bin' ? genomes[g].distances[nodes[i].bin][nodes[j].bin] : genomes[g].chromosomes[nodes[i].chromosome].distances[nodes[j].chromosome]
             : distanceToSquared(elements[nodes[keep[i]][selector]].x, elements[nodes[keep[i]][selector]].y, elements[nodes[keep[i]][selector]].z, elements[nodes[keep[j]][selector]].x, elements[nodes[keep[j]][selector]].y, elements[nodes[keep[j]][selector]].z)
           tiles.push({'chromosome': nodes[keep[i]].chromosome, 'i': i, 'j': j, 'distance': distance })
         }

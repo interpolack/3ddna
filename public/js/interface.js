@@ -312,8 +312,8 @@ function loadData(resolution) {
               for (var d = segmentB[0]; d < segmentB[1]; d++) {
                 distance += genome.distances[s][d]
               }
-              distance /= (segmentB[1] - segmentB[0])
             }
+            distance /= 20
             distances.push(distance)
           }
           genome.chromosomes.push({

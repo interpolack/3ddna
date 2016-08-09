@@ -202,7 +202,7 @@ function onDocumentKeyUp(event) {
         'link': 'and',
         'chromosomes': pin,
         'loci': loci,
-        'threshold': 30,
+        'threshold': 25,
         'index': navigation.length,
       })
     } else if (navigation[navigated].context == 'chromosomes') {
@@ -218,6 +218,7 @@ function onDocumentKeyUp(event) {
       }
       var loci = []
       for (var g = 0; g < genomes.length; g++) {
+        if (genomes[g].type == '2D Matrix') continue
         var locus = null
         for (var i = 0; i < nodes.length; i++) {
           if (!nodes[i].pinned) continue
@@ -247,7 +248,7 @@ function onDocumentKeyUp(event) {
         'bins': pin,
         'nodes': nin,
         'loci': loci,
-        'threshold': 30,
+        'threshold': 25,
         'root': navigation[navigated].index,
       })
     } else if (navigation[navigated].context == 'bins') {
@@ -292,7 +293,7 @@ function onDocumentKeyUp(event) {
         'bins': pin,
         'nodes': nin,
         'loci': loci,
-        'threshold': 30,
+        'threshold': 25,
         'root': navigation[navigated].root,
       })
     }

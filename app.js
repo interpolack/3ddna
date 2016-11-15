@@ -51,6 +51,7 @@ app.get('/interface', function(req, res) {
 app.post('/load3D', upload.any(), function(req, res) {
   // keep track of where the imported files are located
   req.files.map(function(file, i) {
+    console.log(file.filename)
     app.set(file.fieldname, file.filename)
   })
   res.redirect('/interface')
@@ -65,6 +66,12 @@ app.post('/deleteUploads', function(req, res) {
       fs.unlink(item, function(error) { if (error) throw error })
     })
   })
+  app.set('coordinatesA', null)
+  app.set('coordinatesB', null)
+  app.set('coordinatesC', null)
+  app.set('coordinatesD', null)
+  app.set('external', null)
+  app.set('genes', null)
 })
 
 // listen on port 5000 for connections
